@@ -1,0 +1,5 @@
+<RCC>
+    <qresource prefix="/">
+        <file>packml.scxml</file>
+    </qresource>
+</RCC>
