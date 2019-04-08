@@ -1,0 +1,3 @@
+<launch>
+  <node pkg="ros_scxml" type="ros_scxml_node" name="ros_scxml" output="screen"/>
+</launch>
