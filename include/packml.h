@@ -6,6 +6,9 @@
 
 #include <QScxmlStateMachine>
 #include <QWidget>
+#include <QHash>
+
+#include "packml_state.h"
 
 class PackML: public QWidget
 {
@@ -14,12 +17,15 @@ class PackML: public QWidget
 public:
   PackML(QScxmlStateMachine *machine);
 
-  void packmlEvent_Callback(const std_msgs::String::ConstPtr& msg);
+  void packmlEventTrigger_Callback(const std_msgs::String::ConstPtr& msg);
+  void packmlEventConnect_Callback(const std_msgs::String::ConstPtr& msg);
   QStringList stateNames;
 
   packml::PackMLActiveStates activeStates;
 private:
   QScxmlStateMachine *m_machine;
+  QHash<QString,PackmlState> m_stateList;
+  QHash<QString,PackmlState> m_eventList;
 };
 
 #endif // PACKML_H

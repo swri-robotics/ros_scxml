@@ -12,7 +12,12 @@ PackML::PackML(QScxmlStateMachine *machine):
   machine->connectToState(QStringLiteral("Aborted"), stateAborted, &PackmlState::stateChange);
 }
 
-void PackML::packmlEvent_Callback(const std_msgs::String::ConstPtr& msg)
+void PackML::packmlEventTrigger_Callback(const std_msgs::String::ConstPtr& msg)
+{
+  m_machine->submitEvent(msg->data.c_str());
+}
+
+void PackML::packmlEventConnect_Callback(const std_msgs::String::ConstPtr& msg)
 {
   m_machine->submitEvent(msg->data.c_str());
 }

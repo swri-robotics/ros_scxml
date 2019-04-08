@@ -61,8 +61,11 @@ int main(int argc, char **argv)
      foreach(QString str, machine->activeStateNames())
         state_machine.activeStates.state_names.push_back(str.toStdString());
 
-     //TODO: Figure out how to publish array (vector?) of strings
-     //acticve_states_pub.publish(state_machine.activeStates.state_names);
+     packml::PackMLActiveStates as;
+
+     as.state_names = state_machine.activeStates.state_names;
+
+     acticve_states_pub.publish(as);
 
      app.processEvents(QEventLoop::AllEvents);
      throttle.sleep();
