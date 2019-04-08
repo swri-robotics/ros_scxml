@@ -1,2 +1,2 @@
-# packml
+# ros_scxml
 Using QScxmlStateMachine

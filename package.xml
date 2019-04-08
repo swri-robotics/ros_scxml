@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <package format="2">
-  <name>packml</name>
+  <name>ros_scxml</name>
   <version>0.0.0</version>
-  <description>The ros packml package</description>
+  <description>The ros scxml package</description>
 
   <maintainer email="wmccormick@todo.todo">wmccormick</maintainer>
 

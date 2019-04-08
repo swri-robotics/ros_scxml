@@ -1,14 +1,11 @@
 cmake_minimum_required(VERSION 3.1.0)
-project(packml)
+project(ros_scxml)
 
 ## Compile as C++14, supported in ROS Kinetic and newer
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Instruct CMake to run moc automatically when needed
-#set(CMAKE_AUTOMOC ON)
-#set(CMAKE_AUTOMOC_MOC_OPTIONS "-I include")
 # Create code from a list of Qt designer ui files
 set(CMAKE_AUTORCC ON)
 # Find includes in corresponding build directories
@@ -34,7 +31,7 @@ find_package(Qt5 REQUIRED COMPONENTS
 
 add_message_files(
   FILES
-  PackMLActiveStates.msg
+  ActiveStates.msg
 )
 
 generate_messages()
@@ -54,8 +51,8 @@ catkin_package(
 )
 
 qt5_wrap_cpp(PACKML_MOC
-  include/packml_state.h
-  include/packml.h
+  include/ros_scxml_state.h
+  include/ros_scxml.h
 )
 
 include_directories(
@@ -67,8 +64,8 @@ include_directories(
 # State machine library
 add_library(${PROJECT_NAME}_SM
   ${PACKML_MOC}
-  src/packml.cpp
-  src/packml_state.cpp
+  src/ros_scxml.cpp
+  src/ros_scxml_state.cpp
   resource/resource.qrc
 )
 
@@ -80,7 +77,7 @@ target_link_libraries(${PROJECT_NAME}_SM
 )
 
 add_executable(${PROJECT_NAME}_node
-  src/packml_sm.cpp
+  src/ros_scxml_sm.cpp
 )
 # Link libraries
 target_link_libraries(${PROJECT_NAME}_node

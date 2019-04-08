@@ -1,3 +1,0 @@
-<launch>
-  <node pkg="packml" type="packml_node" name="packml" output="screen"/>
-</launch>
