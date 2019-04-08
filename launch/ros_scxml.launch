@@ -1,3 +1,7 @@
 <launch>
-  <node pkg="ros_scxml" type="ros_scxml_node" name="ros_scxml" output="screen"/>
+  <arg name="scxml" default=":packml.scxml" />
+
+  <node pkg="ros_scxml" type="ros_scxml_node" name="ros_scxml" output="screen">
+    <param name="state_machine" value="$(arg scxml)" />
+  </node>
 </launch>

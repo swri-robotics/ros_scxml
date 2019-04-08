@@ -1,5 +1,3 @@
-#include <ros/ros.h>
-#include <ros_scxml/ActiveStates.h>
 
 #include <iostream>
 
@@ -10,28 +8,35 @@
 
 int main(int argc, char **argv)
 {
-  ros::init(argc, argv, "packml");
+  ros::init(argc, argv, "ros_scxml");
   ros::NodeHandle nh("~");
 
   ros::Time::init();
 
   ros::Rate throttle(100);
 
-
   QApplication app(argc, argv);
 
-  ROS_INFO("loading state machine");
+  // get sensor config from params
+  std::string state_machine_file;
+  nh.getParam("state_machine", state_machine_file);
+  ROS_INFO("Loading state machine [%s]", state_machine_file.c_str());
 
   QScxmlStateMachine *machine = QScxmlStateMachine::fromFile(
-              QStringLiteral(":packml.scxml"));
+        QString::fromStdString(state_machine_file));
+
   if (!machine->parseErrors().isEmpty()) {
       QTextStream errs(stderr, QIODevice::WriteOnly);
       const auto errors = machine->parseErrors();
       for (const QScxmlError &error : errors) {
-          errs << error.toString();
+
+        ROS_ERROR("SCXML Parser [%s]: [%s]",
+                  state_machine_file.c_str(),
+                  error.toString().toStdString().c_str());
       }
 
-      return -1;
+      ros::shutdown();
+      return 0;
   }
 
   RosScxml state_machine(machine);
@@ -39,32 +44,30 @@ int main(int argc, char **argv)
   machine->start();
 
   ros::Publisher acticve_states_pub = nh.advertise<ros_scxml::ActiveStates>("active_states", 1);
-  ros::Subscriber event_sub = nh.subscribe("state_event", 1, &RosScxml::eventTrigger_Callback, &state_machine);
   ros::ServiceServer event_service = nh.advertiseService("eventTrigger", &RosScxml::eventTrigger, &state_machine);
+  ros::ServiceServer start_state_machine = nh.advertiseService("start", &RosScxml::start_state_machine, &state_machine);
+  ros::ServiceServer stop_state_machine = nh.advertiseService("stop", &RosScxml::stop_state_machine, &state_machine);
 
-  ROS_INFO("starting state machine");
-
-
-  ROS_INFO("starting app");
-  //Don't think we need this
-  //app.exec();
+  ROS_INFO("Starting state machine");
 
   while(ros::ok())
   {
-     ros::spinOnce();
+    ros::spinOnce();
 
-     state_machine.activeStates.state_names.clear();
-     foreach(QString str, machine->activeStateNames())
-        state_machine.activeStates.state_names.push_back(str.toStdString());
+    state_machine.activeStates.state_names.clear();
+    foreach(QString str, machine->activeStateNames(false))
+    {
+      state_machine.activeStates.state_names.push_back(str.toStdString());
+    }
 
-     ros_scxml::ActiveStates as;
+    ros_scxml::ActiveStates as;
 
-     as.state_names = state_machine.activeStates.state_names;
+    as.state_names = state_machine.activeStates.state_names;
 
-     acticve_states_pub.publish(as);
+    acticve_states_pub.publish(as);
 
-     app.processEvents(QEventLoop::AllEvents);
-     throttle.sleep();
+    app.processEvents(QEventLoop::AllEvents);
+    throttle.sleep();
   }
 
   app.exit();

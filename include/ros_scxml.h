@@ -1,7 +1,10 @@
 #ifndef ROS_SCXML_H
 #define ROS_SCXML_H
+#include <ros/ros.h>
 
 #include <std_msgs/String.h>
+#include <std_srvs/Trigger.h>
+
 #include <ros_scxml/ActiveStates.h>
 #include <ros_scxml/TriggerEvent.h>
 
@@ -25,10 +28,11 @@ public:
   ros_scxml::ActiveStates activeStates;
 
   bool eventTrigger(ros_scxml::TriggerEvent::Request& req, ros_scxml::TriggerEvent::Response& res);
+  bool start_state_machine(std_srvs::TriggerRequest& req, std_srvs::TriggerResponse& res);
+  bool stop_state_machine(std_srvs::TriggerRequest& req, std_srvs::TriggerResponse& res);
 private:
   QScxmlStateMachine *m_machine;
   QHash<QString, RosScxmlState*> m_stateList;
-  //QHash<QString,PackmlState> m_eventList;
 };
 
 #endif // ROS_SCXML_H

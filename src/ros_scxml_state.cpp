@@ -1,11 +1,8 @@
-#include "ros_scxml_state.h"
 #include <iostream>
+
 #include <QWidget>
 
-RosScxmlState::RosScxmlState(QWidget *parent)
-  : QWidget(parent)
-{
-}
+#include "ros_scxml_state.h"
 
 void RosScxmlState::stateChange(bool state)
 {
@@ -13,8 +10,8 @@ void RosScxmlState::stateChange(bool state)
     m_state = state;
 
 
-  std::cout <<  "State is now:" << m_state;
+  ROS_INFO("State [%s] is now [%d]",  m_name.toStdString().c_str(), m_state);
 
-  emit stateChanged();
+  emit stateChanged(m_state);
 }
 
