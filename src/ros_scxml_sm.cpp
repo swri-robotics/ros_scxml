@@ -40,11 +40,13 @@ int main(int argc, char **argv)
 
   ros::Publisher acticve_states_pub = nh.advertise<ros_scxml::ActiveStates>("active_states", 1);
   ros::Subscriber event_sub = nh.subscribe("state_event", 1, &RosScxml::eventTrigger_Callback, &state_machine);
+  ros::ServiceServer event_service = nh.advertiseService("eventTrigger", &RosScxml::eventTrigger, &state_machine);
 
   ROS_INFO("starting state machine");
 
 
   ROS_INFO("starting app");
+  //Don't think we need this
   //app.exec();
 
   while(ros::ok())

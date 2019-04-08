@@ -21,7 +21,7 @@ RosScxml::RosScxml(QScxmlStateMachine *machine):
 
     m_stateList.insert(stateName, stateWidget);
     m_machine->connectToState(stateName, stateWidget, &RosScxmlState::stateChange);
-    ROS_INFO("Found state [%s]" , stateName.toStdString().c_str());
+    ROS_INFO("Connected to state [%s]" , stateName.toStdString().c_str());
   }
 
 }
@@ -34,4 +34,9 @@ void RosScxml::eventTrigger_Callback(const std_msgs::String::ConstPtr& msg)
 void RosScxml::eventConnect_Callback(const std_msgs::String::ConstPtr& msg)
 {
   m_machine->submitEvent(msg->data.c_str());
+}
+
+bool RosScxml::eventTrigger(ros_scxml::TriggerEvent::Request& req, ros_scxml::TriggerEvent::Response& res)
+{
+  m_machine->submitEvent(req.event.c_str());
 }

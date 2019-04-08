@@ -34,8 +34,15 @@ add_message_files(
   ActiveStates.msg
 )
 
-generate_messages()
+add_service_files(
+  FILES
+  TriggerEvent.srv
+)
 
+generate_messages(
+  DEPENDENCIES
+  std_msgs
+)
 
 catkin_package(
   INCLUDE_DIRS

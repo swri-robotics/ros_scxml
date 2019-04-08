@@ -3,6 +3,7 @@
 
 #include <std_msgs/String.h>
 #include <ros_scxml/ActiveStates.h>
+#include <ros_scxml/TriggerEvent.h>
 
 #include <QScxmlStateMachine>
 #include <QWidget>
@@ -22,6 +23,8 @@ public:
   QStringList stateNames;
 
   ros_scxml::ActiveStates activeStates;
+
+  bool eventTrigger(ros_scxml::TriggerEvent::Request& req, ros_scxml::TriggerEvent::Response& res);
 private:
   QScxmlStateMachine *m_machine;
   QHash<QString, RosScxmlState*> m_stateList;
