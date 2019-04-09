@@ -11,7 +11,8 @@ set(CMAKE_AUTORCC ON)
 # Find includes in corresponding build directories
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
-list(APPEND CMAKE_PREFIX_PATH /opt/ros/kinetic)
+#list(APPEND CMAKE_PREFIX_PATH /opt/ros/kinetic)
+list(APPEND CMAKE_PREFIX_PATH /opt/ros/melodic)
 list(APPEND CMAKE_PREFIX_PATH /opt/Qt5.12.2/5.12.2/gcc_64)
 
 ## Find catkin macros and libraries
@@ -57,7 +58,7 @@ catkin_package(
     Qt5
 )
 
-qt5_wrap_cpp(PACKML_MOC
+qt5_wrap_cpp(SCXML_MOC
   include/ros_scxml_state.h
   include/ros_scxml.h
 )
@@ -70,7 +71,7 @@ include_directories(
 
 # State machine library
 add_library(${PROJECT_NAME}_SM
-  ${PACKML_MOC}
+  ${SCXML_MOC}
   src/ros_scxml.cpp
   src/ros_scxml_state.cpp
   resource/resource.qrc

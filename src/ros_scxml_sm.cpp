@@ -39,6 +39,7 @@ int main(int argc, char **argv)
       return 0;
   }
 
+  ROS_INFO("Starting state machine");
   RosScxml state_machine(machine);
   machine->setParent(&state_machine);
   machine->start();
@@ -48,9 +49,8 @@ int main(int argc, char **argv)
   ros::ServiceServer start_state_machine = nh.advertiseService("start", &RosScxml::start_state_machine, &state_machine);
   ros::ServiceServer stop_state_machine = nh.advertiseService("stop", &RosScxml::stop_state_machine, &state_machine);
 
-  ROS_INFO("Starting state machine");
-
-  while(ros::ok())
+  //TODO: Figure out how to intercept machine->dataModelChanged and die gracefully
+  while(ros::ok() && machine->isInitialized())
   {
     ros::spinOnce();
 

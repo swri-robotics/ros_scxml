@@ -14,6 +14,7 @@ RosScxml::RosScxml(QScxmlStateMachine *machine):
 
   //Create a hash table of state objects by name
   //TODO: add options for compressed/not compressed
+
   foreach(QString stateName, machine->stateNames(COMPRESS_MODE))
   {
     RosScxmlState* stateWidget = new RosScxmlState(this, stateName);
@@ -28,10 +29,18 @@ bool RosScxml::eventTrigger(ros_scxml::TriggerEvent::Request& req, ros_scxml::Tr
 {
   //TODO: Do we submitEvents to a SM that is stopped? Check if running first?
   //TODO: Might need to connect to the event first, and fail if wee cannot connect?
-  m_machine->submitEvent(req.event.c_str());
+  if(m_machine->isRunning())
+  {
+    m_machine->submitEvent(req.event.c_str());
 
-  res.message = "TODO: get feedback from the SM to know if the event is valid and what the status of submitting it is/was";
-  res.success = true;
+    res.message = "TODO: get feedback from the SM to know if the event is valid and what the status of submitting it is/was";
+    res.success = true;
+  }
+  else
+  {
+    res.message = "Cannot set event while machine is stopped";
+    res.success = false;
+  }
 }
 
 bool RosScxml::start_state_machine(std_srvs::TriggerRequest& req, std_srvs::TriggerResponse& res)
@@ -46,7 +55,7 @@ bool RosScxml::start_state_machine(std_srvs::TriggerRequest& req, std_srvs::Trig
   }
   else
   {
-    res.message = "Could not start State Machine";
+    res.message = "Cannot not start State Machine";
     res.success = false;
   }
 }
@@ -61,7 +70,7 @@ bool RosScxml::stop_state_machine(std_srvs::TriggerRequest& req, std_srvs::Trigg
   }
   else
   {
-    res.message = "Could not stop State Machine";
+    res.message = "Cannot not stop State Machine";
     res.success = false;
   }
 }
