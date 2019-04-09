@@ -3,7 +3,7 @@
     <qt:editorinfo initialGeometry="283.44;885.89;-20;-20;40;40"/>
     <state id="st1Faulted">
         <qt:editorinfo scenegeometry="459.98;910.20;372.09;794.47;478.02;182.85" geometry="459.98;910.20;-87.89;-115.73;478.02;182.85"/>
-        <transition type="external" event="userClear" target="st1Operation">
+        <transition type="external" event="userClear" target="st1Operation" cond="In(st2Aborted)">
             <qt:editorinfo endTargetFactors="49.13;94.46"/>
         </transition>
         <state id="st2Aborting">
@@ -17,14 +17,14 @@
     <state id="st1Operation" initial="st2Clearing">
         <qt:editorinfo scenegeometry="456.62;624.78;42.92;-37.88;1159.58;769.61" geometry="456.62;624.78;-413.70;-662.66;1159.58;769.61"/>
         <transition type="external" event="userAbort" target="st1Faulted">
-            <qt:editorinfo startTargetFactors="64.49;90.34" endTargetFactors="84.65;10.12" movePoint="15.24;3.05"/>
+            <qt:editorinfo endTargetFactors="84.65;10.12" movePoint="15.24;3.05" startTargetFactors="64.49;90.34"/>
         </transition>
         <state id="st2Process">
             <qt:editorinfo scenegeometry="254.99;222.48;67.31;49.01;1115.19;453.85" geometry="-201.63;-402.30;-187.68;-173.47;1115.19;453.85"/>
             <state id="st3Reseting">
                 <qt:editorinfo scenegeometry="151.37;428.71;91.37;378.71;136.21;100" geometry="-103.62;206.23;-60;-50;136.21;100"/>
                 <transition type="external" event="trIdle" target="st3Idle">
-                    <qt:editorinfo startTargetFactors="50.74;14.91" movePoint="68.07;12.19"/>
+                    <qt:editorinfo movePoint="68.07;12.19" startTargetFactors="50.74;14.91"/>
                 </transition>
             </state>
             <transition type="external" event="userStop" target="st2Stopping">

@@ -11,8 +11,8 @@ set(CMAKE_AUTORCC ON)
 # Find includes in corresponding build directories
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
+list(APPEND CMAKE_PREFIX_PATH /opt/ros/$ENV{ROS_DISTRO})
 #list(APPEND CMAKE_PREFIX_PATH /opt/ros/kinetic)
-list(APPEND CMAKE_PREFIX_PATH /opt/ros/melodic)
 list(APPEND CMAKE_PREFIX_PATH /opt/Qt5.12.2/5.12.2/gcc_64)
 
 ## Find catkin macros and libraries
