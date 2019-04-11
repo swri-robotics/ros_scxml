@@ -76,7 +76,7 @@ StateMachine::TransitionTable buildTransitionTable(const QScxmlStateMachineInfo*
     TransitionEventsMap event_states_map = {};
     for(std::size_t j = 0; j < transition_events.size(); j++)
     {
-      std::string tr_event_name = transition_events[i].toStdString();
+      std::string tr_event_name = transition_events[j].toStdString();
       if(event_states_map.count(tr_event_name) > 0)
       {
         std::vector<std::string>& st_names = event_states_map.at(tr_event_name);
@@ -163,7 +163,9 @@ bool StateMachine::loadFile(const std::string& filename)
     return false;
   }
 
+
   sm_info_ = new QScxmlStateMachineInfo(sm_);
+
   ttable_ = buildTransitionTable(sm_info_);
   signalSetup();
   return true;
@@ -185,6 +187,7 @@ bool StateMachine::start()
   });
 
   execute_action_timer_->start(1000*event_loop_period_);
+  is_busy_= false;
   sm_->start();
   return true;
 }

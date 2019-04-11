@@ -128,6 +128,7 @@ int main(int argc, char **argv)
     ROS_ERROR("Failed to load state machine file %s",state_machine_file.c_str());
     return -1;
   }
+  ROS_INFO("Loaded file");
 
   if(!sm->start())
   {

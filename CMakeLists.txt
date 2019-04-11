@@ -103,13 +103,13 @@ target_link_libraries(${PROJECT_NAME}
   ${Qt5Scxml_LIBRARIES}
 )
 
-add_executable(${PROJECT_NAME}_node
-  src/ros_scxml_sm.cpp
+add_executable(demo_scxml_state_machine
+  src/demo_scxml_sm.cpp
 )
-add_dependencies(${PROJECT_NAME}_node  ${catkin_EXPORTED_TARGETS})
+add_dependencies(demo_scxml_state_machine  ${catkin_EXPORTED_TARGETS})
 
 # Link libraries
-target_link_libraries(${PROJECT_NAME}_node
+target_link_libraries(demo_scxml_state_machine
   ${catkin_LIBRARIES}
   ${PROJECT_NAME}
   ${Qt5Core_LIBRARIES}
