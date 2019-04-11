@@ -3,6 +3,7 @@
 #include <ros/ros.h>
 
 #include <QScxmlStateMachine>
+#include <private/qscxmlstatemachineinfo_p.h>
 #include <QWidget>
 
 class RosScxmlState: public QWidget
