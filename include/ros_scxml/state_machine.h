@@ -15,6 +15,9 @@
 #include <private/qscxmlstatemachineinfo_p.h>
 #include <QWidget>
 #include <QTimer>
+#include <QThread>
+#include <QThreadPool>
+#include <QtConcurrent/QtConcurrent>
 #include <boost/none.hpp>
 #include <boost/any.hpp>
 
@@ -92,21 +95,21 @@ struct Response
 
 class StateMachine: public QObject
 {
-  Q_OBJECT
 public:
-
 
   typedef std::function< Response (const Action& ) > EntryCallback;
   typedef std::map<std::string,std::map<std::string,std::vector<std::string>>> TransitionTable;
 
 
+private:
+
   class EntryCbHandler
   {
   public:
-    EntryCbHandler(QObject* parent,EntryCallback cb,bool async_execution = false):
+    EntryCbHandler(QThreadPool* thread_pool,EntryCallback cb,bool async_execution = false):
       cb_(cb),
       async_execution_(async_execution),
-      one_shot_cb_timer_(new QTimer(parent))
+      tpool_(thread_pool)
     {
 
     }
@@ -116,13 +119,9 @@ public:
       Response res;
       if(async_execution_)
       {
-        // passing the sender as the receiver as a workaround to there not being an overload that takes
-        // a UniqueConnection flag
-        connect(one_shot_cb_timer_, &QTimer::timeout,one_shot_cb_timer_,[this,arg](){
-          (*this)(arg);
-        },Qt::UniqueConnection);
-        one_shot_cb_timer_->setSingleShot(true);
-        one_shot_cb_timer_->start(100);
+        QFuture<Response> future = QtConcurrent::run(tpool_,[this,arg](){
+          return cb_(arg);
+        });
         res = true;
       }
       else
@@ -135,10 +134,13 @@ public:
   private:
     bool async_execution_;
     EntryCallback cb_;
-    QTimer* one_shot_cb_timer_;
+    QThreadPool* tpool_;
 
   };
   typedef std::shared_ptr<EntryCbHandler> EntryCbHandlerPtr;
+
+  Q_OBJECT
+public:
 
   StateMachine(double event_loop_period = 0.1);
   StateMachine(QScxmlStateMachine* sm, double event_loop_period = 0.1);
@@ -162,7 +164,22 @@ public:
    * @param action  The action to execute
    */
   void postAction(Action action);
+
+  /**
+   * @brief adds an callback that gets invoked when a state is entered
+   * @param st_name         The name of the state
+   * @param cb              The callback to be invoked; it can be a blocking function.
+   * @param async_execution Set to true for blocking callbacks; the callback will be executed asynchronously
+   * @return  True on success, false otherwise
+   */
   bool addEntryCallback(const std::string& st_name,EntryCallback cb, bool async_execution = false);
+
+  /**
+   * @brief adds an callback that gets invoked when a state is exited
+   * @param st_name The name of the state
+   * @param cb      The callback to be invoked; it must be a non-blocking function.
+   * @return  True on success, false otherwise
+   */
   bool addExitCallback(const std::string& st_name,std::function< void ()> cb);
 
   /**
@@ -171,8 +188,8 @@ public:
    */
   std::vector<std::string> getAvailableActions() const;
   std::vector<std::string> getActions(const std::string& state_name) const;
-  std::string getCurrentState() const;
-  std::vector<std::string> getStates() const;
+  std::string getCurrentState(bool full_name = false) const;
+  std::vector<std::string> getStates(bool full_name = false) const;
   bool hasAction(const std::string& state_name, const Action& action);
   bool hasState(const std::string state_name);
 
@@ -198,7 +215,7 @@ protected:
   void signalSetup();
   Response executeAction(const Action& action);
   void processQueuedActions();
-  std::vector<std::string> getCurrentStates() const;
+  std::vector<std::string> getCurrentStates(bool full_name = false) const;
 
   // state machine members
   QScxmlStateMachineInfo* sm_info_;
@@ -216,6 +233,7 @@ protected:
   std::atomic<bool> is_busy_;
   std::map<std::string, EntryCbHandlerPtr> entry_callbacks_;
   std::map<std::string, std::function< void() > > exit_callbacks_;
+  QThreadPool* async_thread_pool_;
 
 };
 

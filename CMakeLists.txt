@@ -6,33 +6,14 @@ set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-#### QT setup
-# Create code from a list of Qt designer ui files
-#set(CMAKE_AUTORCC ON)
 
-# Find includes in corresponding build directories
-#set(CMAKE_INCLUDE_CURRENT_DIR ON)
-# Instruct CMake to run moc automatically when needed
-#set(CMAKE_AUTOMOC ON)
-# Create code from a list of Qt designer ui files
-#set(CMAKE_AUTOUIC ON)
-
-# Find includes in corresponding build directories
-#set(CMAKE_INCLUDE_CURRENT_DIR ON)
-
-#list(APPEND CMAKE_PREFIX_PATH /opt/ros/kinetic)
-#list(APPEND CMAKE_PREFIX_PATH /opt/qt/5.12.2/gcc_64)
-
-## Find catkin macros and libraries
-## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
-## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
   roscpp
   std_msgs
   message_generation
 )
 
-#include(QtInstallPaths) #to set QT_INSTALL_FOO variables
+#### QT setup
 find_package(Qt5 REQUIRED COMPONENTS
   Core
   Widgets

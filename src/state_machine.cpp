@@ -39,6 +39,25 @@ public:
   std::atomic<bool>* b_;
 };
 
+std::string getStateFullName(const QScxmlStateMachineInfo* sm_info, const QScxmlStateMachineInfo::StateId id)
+{
+  using StateId = QScxmlStateMachineInfo::StateId;
+
+  StateId parent_id = sm_info->stateParent(id);
+  std::string full_name = sm_info->stateName(id).toStdString();
+  while(parent_id != QScxmlStateMachineInfo::InvalidStateId)
+  {
+    std::string parent_name = sm_info->stateName(parent_id).toStdString();
+    if(parent_name.empty())
+    {
+      break;
+    }
+    full_name = parent_name + "::" + full_name;
+    parent_id = sm_info->stateParent(parent_id);
+  }
+  return std::move(full_name);
+}
+
 StateMachine::TransitionTable buildTransitionTable(const QScxmlStateMachineInfo* sm_info)
 {
   StateMachine::TransitionTable table;
@@ -123,7 +142,8 @@ StateMachine::TransitionTable buildTransitionTable(const QScxmlStateMachineInfo*
 StateMachine::StateMachine(double event_loop_period):
   sm_(nullptr),
   sm_info_(nullptr),
-  event_loop_period_(event_loop_period)
+  event_loop_period_(event_loop_period),
+  async_thread_pool_(new QThreadPool(this))
 {
 
 }
@@ -132,6 +152,7 @@ StateMachine::StateMachine(QScxmlStateMachine* sm, double event_loop_period):
   sm_(sm),
   sm_info_(new QScxmlStateMachineInfo(sm)),
   event_loop_period_(event_loop_period),
+  async_thread_pool_(new QThreadPool(this)),
   ttable_(buildTransitionTable(sm_info_))
 {
   signalSetup();
@@ -271,17 +292,25 @@ Response StateMachine::executeAction(const Action& action)
   ScopeExit scope_exit(&this->is_busy_); // sets the flag to busy
 
   Response res;
-  std::string current_state = getCurrentState();
-  if(!hasAction(current_state,action))
+  std::vector<std::string> current_states = getCurrentStates();
+  std::string current_src_state;
+  if(!std::any_of(current_states.begin(), current_states.end(),[&](const std::string& st){
+    if(hasAction(st,action))
+    {
+      current_src_state = st;
+      return true;
+    }
+    return false;
+  }))
   {
-    res.msg = boost::str(boost::format("Action '%s' is not valid for the current state") % action.id);
+    res.msg = boost::str(boost::format("Action '%s' is not valid for any of the active states") % action.id);
     res.success = false;
     ROS_ERROR_STREAM(res.msg);
     return std::move(res);
   }
 
   // finding target state
-  std::string target_state = ttable_[current_state].at(action.id).front();
+  std::string target_state = ttable_[current_src_state].at(action.id).front();
   if(target_state.empty())
   {
     res.msg = "Target state is invalid";
@@ -289,11 +318,13 @@ Response StateMachine::executeAction(const Action& action)
     return std::move(res);
   }
 
-  // invoke exit callback
-  if(exit_callbacks_.count(current_state) > 0)
-  {
-    exit_callbacks_.at(current_state)();
-  }
+  // invoke exit callbacks (states should be arrange by hierarchy, children -> parent)
+  std::for_each(current_states.begin(),current_states.end(),[this](const std::string& st){
+    if(exit_callbacks_.count(st) > 0)
+    {
+      exit_callbacks_.at(st)();
+    }
+  });
 
   // submitting event
   sm_->submitEvent(QString::fromStdString(action.id));
@@ -301,10 +332,11 @@ Response StateMachine::executeAction(const Action& action)
   // wait until QT makes the transition to the target state
   QTime stop_time = QTime::currentTime().addMSecs(WAIT_TRANSITION_PERIOD);
   bool transition_made = false;
+  std::vector<std::string> new_current_states;
   while(QTime::currentTime() < stop_time)
   {
-    std::vector<std::string> current_states = getCurrentStates();
-    if(std::any_of(current_states.begin(),current_states.end(),[&target_state](const std::string& st){
+    new_current_states = getCurrentStates();
+    if(std::any_of(new_current_states.begin(),new_current_states.end(),[&target_state](const std::string& st){
       return target_state == st;
     }))
     {
@@ -323,19 +355,33 @@ Response StateMachine::executeAction(const Action& action)
   }
 
   // calling entry callback
-  if(entry_callbacks_.count(target_state) > 0)
+  res.success = true;
+  std::vector<Response> responses;
+  std::reverse(std::begin(new_current_states),std::end(new_current_states));
+  for(const std::string& st : new_current_states)
   {
-    res = (*entry_callbacks_.at(target_state))(action);
-  }
-  else
-  {
-    res.success = true;
+    Response new_res;
+    if(entry_callbacks_.count(st) > 0)
+    {
+      new_res = (*entry_callbacks_.at(st))(action);
+    }
+    else
+    {
+      new_res.success = true;
+    }
+
+    if(!new_res)
+    {
+      ROS_ERROR_STREAM(res.msg);
+    }
+
+    responses.push_back(std::move(new_res));
   }
 
-  if(!res)
-  {
-    ROS_ERROR_STREAM(res.msg);
-  }
+  // choosing the rirst bad result if there is one
+  res = std::accumulate(responses.begin(),responses.end(),responses.front(),[](Response result, const Response& r){
+    return (!result) ? result : r;
+  });
 
   return res;
 }
@@ -352,7 +398,7 @@ bool StateMachine::addEntryCallback(const std::string& st_name, EntryCallback cb
   {
     ROS_WARN("Entry callback for state %s will be replaced", st_name.c_str());
   }
-  entry_callbacks_.insert(std::make_pair(st_name,std::make_shared<EntryCbHandler>(this,cb,async_execution)));
+  entry_callbacks_.insert(std::make_pair(st_name,std::make_shared<EntryCbHandler>(async_thread_pool_,cb,async_execution)));
 
   return true;
 }
@@ -369,6 +415,7 @@ bool StateMachine::addExitCallback(const std::string& st_name, std::function<voi
     ROS_WARN("Exit callback for state %s will be replaced", st_name.c_str());
   }
   exit_callbacks_.insert(std::make_pair(st_name,cb));
+  return true;
 }
 
 std::vector<std::string> StateMachine::getAvailableActions() const
@@ -400,18 +447,36 @@ std::vector<std::string> StateMachine::getActions(const std::string& state_name)
   return std::move(action_ids);
 }
 
-std::string StateMachine::getCurrentState() const
+std::string StateMachine::getCurrentState(bool full_name) const
 {
   QVector<SMInfo::StateId> state_ids = sm_info_->configuration();
-  return std::move(sm_info_->stateName(state_ids.front()).toStdString());
+  SMInfo::StateId current_st_id = state_ids.front();
+  for(SMInfo::StateId id : state_ids)
+  {
+    QVector<SMInfo::StateId> children = sm_info_->stateChildren(id);
+    if(children.empty())
+    {
+      current_st_id = id;
+      break;
+    }
+  }
+  return full_name ? getStateFullName(sm_info_,current_st_id) :
+      std::move(sm_info_->stateName(current_st_id).toStdString());
 }
 
-std::vector<std::string> StateMachine::getStates() const
+std::vector<std::string> StateMachine::getStates(bool full_name) const
 {
-  QStringList st_list = sm_->stateNames();
+  QVector<SMInfo::StateId> state_ids = sm_info_->allStates();
+
+  // sort by parenthood
+  std::sort(state_ids.begin(),state_ids.end(),[this](SMInfo::StateId s1, SMInfo::StateId s2){
+    return sm_info_->stateChildren(s1).size() < sm_info_->stateChildren(s2).size();
+  });
+
   std::vector<std::string> st_names;
-  std::transform(st_list.begin(),st_list.end(),std::back_inserter(st_names),[](const QString& s){
-    return s.toStdString();
+  std::transform(state_ids.begin(),state_ids.end(),std::back_inserter(st_names),
+                 [this,full_name](const SMInfo::StateId& id){
+    return full_name ? getStateFullName(sm_info_,id) : sm_info_->stateName(id).toStdString();
   });
   return std::move(st_names);
 }
@@ -424,12 +489,19 @@ bool StateMachine::hasState(const std::string state_name)
   });
 }
 
-std::vector<std::string> StateMachine::getCurrentStates() const
+std::vector<std::string> StateMachine::getCurrentStates(bool full_name) const
 {
   std::vector<std::string> st_names;
   QVector<SMInfo::StateId> state_ids = sm_info_->configuration();
-  std::transform(state_ids.begin(),state_ids.end(),std::back_inserter(st_names),[this](const SMInfo::StateId& id){
-    return sm_info_->stateName(id).toStdString();
+
+  // sort by parenthood
+  std::sort(state_ids.begin(),state_ids.end(),[this](SMInfo::StateId s1, SMInfo::StateId s2){
+    return sm_info_->stateChildren(s1).size() < sm_info_->stateChildren(s2).size();
+  });
+
+  std::transform(state_ids.begin(),state_ids.end(),std::back_inserter(st_names),[this,full_name](const SMInfo::StateId& id){
+    return full_name ? getStateFullName(sm_info_,id) :
+        sm_info_->stateName(id).toStdString();
   });
   return std::move(st_names);
 }
@@ -457,14 +529,14 @@ void StateMachine::signalSetup()
   connect(sm_info_,&SMInfo::statesEntered,[this](const QVector<QScxmlStateMachineInfo::StateId>& states){
     for(const QScxmlStateMachineInfo::StateId& id : states)
     {
-      emit this->state_entered(sm_info_->stateName(id).toStdString());
+      emit this->state_entered(getStateFullName(sm_info_,id));
     }
   });
 
   connect(sm_info_,&SMInfo::statesExited,[this](const QVector<QScxmlStateMachineInfo::StateId>& states){
     for(const QScxmlStateMachineInfo::StateId& id : states)
     {
-      emit this->state_exited(sm_info_->stateName(id).toStdString());
+      emit this->state_exited(getStateFullName(sm_info_,id));
     }
   });
 }

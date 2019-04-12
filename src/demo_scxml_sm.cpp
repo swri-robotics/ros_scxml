@@ -11,6 +11,7 @@
 static const std::string CURRENT_STATE_TOPIC = "current_state";
 static const std::string EXECUTE_STATE_TOPIC = "execute_state";
 static const std::string PRINT_ACTIONS_SERVICE = "print_actions";
+static const std::string PROCESS_EXECUTION_MSG = "process_msg";
 
 using namespace ros_scxml;
 
@@ -97,6 +98,67 @@ protected:
   StateMachine* sm_;
 };
 
+class MockApplication
+{
+public:
+  MockApplication(ros::NodeHandle nh)
+  {
+    continue_process_ = false;
+    ready_ = false;
+    process_msg_pub_ = nh.advertise<std_msgs::String>(PROCESS_EXECUTION_MSG,1);
+  }
+
+  ~MockApplication()
+  {
+
+  }
+
+  void resetProcess()
+  {
+    ready_ = true;
+    continue_process_ = true;
+    ROS_INFO_NAMED("Process","Reseted process variables");
+  }
+
+  /**
+   * @brief this is a blocking function
+   * @return True on success, false otherwise
+   */
+  bool executeProcess()
+  {
+    if(!ready_)
+    {
+      return false;
+    }
+
+    ros::Duration process_pause(2.0);
+    while(continue_process_ && ros::ok())
+    {
+      std_msgs::String msg;
+      msg.data = boost::str(boost::format("Executing process at time %f") % ros::Time::now().toSec());
+      process_msg_pub_.publish(msg);
+      process_pause.sleep();
+    }
+
+    return true;
+  }
+
+  void haltProcess()
+  {
+    continue_process_ = false;
+    ready_ = false;
+    ROS_INFO_NAMED("Process","Process halted");
+    return;
+  }
+
+
+protected:
+  ros::Publisher process_msg_pub_;
+  std::atomic<bool> continue_process_;
+  std::atomic<bool> ready_;
+
+};
+
 
 int main(int argc, char **argv)
 {
@@ -130,14 +192,60 @@ int main(int argc, char **argv)
   }
   ROS_INFO("Loaded file");
 
-  if(!sm->start())
+  // adding application methods to SM
+  MockApplication process_app(nh);
+  bool success = false;
+  std::vector< std::function<bool ()> > functions = {
+    [&]() -> bool{
+      return sm->addEntryCallback("st3Reseting",[&](const Action& action) -> Response{
+        process_app.resetProcess();
+        ros::Duration(3.0).sleep();
+        // queuing action, should exit the state
+        sm->postAction(Action{.id="trIdle"});
+        return true;
+      },false); // false = runs sequentially, use for non-blocking functions
+    },
+    [&]() -> bool{
+      return sm->addEntryCallback("st3Execute",[&process_app](const Action& action) -> Response{
+        return process_app.executeProcess();
+      },true); // true = runs asynchronously, use for blocking functions
+    },
+    [&]() -> bool{
+      return sm->addExitCallback("st3Execute",[&process_app](){
+        process_app.haltProcess();
+      });
+    },
+    [&]() -> bool{
+      return sm->addEntryCallback("st2Clearing",[&](const Action& action) -> Response{
+        ROS_INFO("Clearing to enable process, please wait ...");
+        ros::Duration(3.0).sleep();
+        ROS_INFO("Done Clearing");
+
+        // queuing action, should exit the state
+        sm->postAction(Action{.id="trStopped"});
+        return true;
+      }, true); // true = runs asynchronously, use for blocking functions
+    }
+  };
+
+  // calling all functions and evaluating returned args
+  if(!std::all_of(functions.begin(),functions.end(),[](auto& f){
+    return f();
+  }))
   {
-    ROS_ERROR("Failed to start SM");
+    ROS_ERROR("Failed to setup application specific functions");
     return -1;
   }
 
   // create ROS interface
   ROSInterface ros_interface(nh,sm);
+
+  // start sm
+  if(!sm->start())
+  {
+    ROS_ERROR("Failed to start SM");
+    return -1;
+  }
 
   // main loop
   while(ros::ok())
