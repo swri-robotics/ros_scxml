@@ -1,12 +1,10 @@
 
 #include <iostream>
-#include "ros_scxml/state_machine.h"
-
-#include <QTextStream>
+#include <ros/ros.h>
+#include <std_srvs/Trigger.h>
+#include <std_msgs/String.h>
 #include <QApplication>
-
-#include "ros_scxml.h"
-
+#include "ros_scxml/state_machine.h"
 
 static const std::string CURRENT_STATE_TOPIC = "current_state";
 static const std::string EXECUTE_STATE_TOPIC = "execute_state";

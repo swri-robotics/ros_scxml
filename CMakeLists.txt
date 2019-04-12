@@ -10,7 +10,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 find_package(catkin REQUIRED COMPONENTS
   roscpp
   std_msgs
-  message_generation
+  std_srvs
 )
 
 #### QT setup
@@ -20,20 +20,6 @@ find_package(Qt5 REQUIRED COMPONENTS
   Scxml
 )
 
-add_message_files(
-  FILES
-  ActiveStates.msg
-)
-
-add_service_files(
-  FILES
-  TriggerEvent.srv
-)
-
-generate_messages(
-  DEPENDENCIES
-  std_msgs
-)
 
 catkin_package(
   INCLUDE_DIRS
@@ -43,7 +29,6 @@ catkin_package(
   CATKIN_DEPENDS
     roscpp
     std_msgs
-    message_runtime
   DEPENDS
     Qt5Core
     Qt5Widgets
@@ -52,8 +37,6 @@ catkin_package(
 
 set(ROS_SCXML_HEADERS
   include/ros_scxml/state_machine.h
-  include/ros_scxml_state.h
-  include/ros_scxml.h
 )
 
 qt5_wrap_cpp(ROS_SCXML_MOCS ${ROS_SCXML_HEADERS}
@@ -71,12 +54,9 @@ include_directories(
 # State machine library
 add_library(${PROJECT_NAME}
   src/state_machine.cpp
-  src/ros_scxml.cpp
-  src/ros_scxml_state.cpp  
   ${ROS_SCXML_MOCS}
 )
 
-add_dependencies(${PROJECT_NAME} ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 target_link_libraries(${PROJECT_NAME}
   ${catkin_LIBRARIES}
   ${Qt5Core_LIBRARIES}
@@ -84,12 +64,11 @@ target_link_libraries(${PROJECT_NAME}
   ${Qt5Scxml_LIBRARIES}
 )
 
+# Demo Executable
 add_executable(demo_scxml_state_machine
   src/demo_scxml_sm.cpp
 )
-add_dependencies(demo_scxml_state_machine  ${catkin_EXPORTED_TARGETS})
 
-# Link libraries
 target_link_libraries(demo_scxml_state_machine
   ${catkin_LIBRARIES}
   ${PROJECT_NAME}
