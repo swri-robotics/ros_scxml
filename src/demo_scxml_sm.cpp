@@ -194,6 +194,8 @@ int main(int argc, char **argv)
   MockApplication process_app(nh);
   bool success = false;
   std::vector< std::function<bool ()> > functions = {
+
+    // custom function invoked when the "st3Reseting" state is entered
     [&]() -> bool{
       return sm->addEntryCallback("st3Reseting",[&](const Action& action) -> Response{
         process_app.resetProcess();
@@ -203,16 +205,22 @@ int main(int argc, char **argv)
         return true;
       },false); // false = runs sequentially, use for non-blocking functions
     },
+
+    // custom function invoked when the "st3Execute" state is entered
     [&]() -> bool{
       return sm->addEntryCallback("st3Execute",[&process_app](const Action& action) -> Response{
         return process_app.executeProcess();
       },true); // true = runs asynchronously, use for blocking functions
     },
+
+    // custom function invoked when the "st3Execute" state is exited
     [&]() -> bool{
       return sm->addExitCallback("st3Execute",[&process_app](){
         process_app.haltProcess();
       });
     },
+
+    // custom function invoked when the "st2Clearing" state is entered, it will exit after waiting for 3 seconds
     [&]() -> bool{
       return sm->addEntryCallback("st2Clearing",[&](const Action& action) -> Response{
         ROS_INFO("Clearing to enable process, please wait ...");
