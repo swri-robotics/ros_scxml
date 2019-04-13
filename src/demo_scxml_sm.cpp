@@ -7,7 +7,7 @@
 #include "ros_scxml/state_machine.h"
 
 static const std::string CURRENT_STATE_TOPIC = "current_state";
-static const std::string EXECUTE_STATE_TOPIC = "execute_state";
+static const std::string EXECUTE_ACTION_TOPIC = "execute_action";
 static const std::string PRINT_ACTIONS_SERVICE = "print_actions";
 static const std::string PROCESS_EXECUTION_MSG = "process_msg";
 
@@ -35,7 +35,7 @@ public:
     });
 
     // prompts the sm to execute an action.
-    execute_state_subs_ = nh.subscribe<std_msgs::String>(EXECUTE_STATE_TOPIC,1,
+    execute_state_subs_ = nh.subscribe<std_msgs::String>(EXECUTE_ACTION_TOPIC,1,
                                                          [this](const std_msgs::StringConstPtr& msg){
       if(sm_->isBusy())
       {
@@ -225,13 +225,19 @@ int main(int argc, char **argv)
       return sm->addEntryCallback("st2Clearing",[&](const Action& action) -> Response{
         ROS_INFO("Clearing to enable process, please wait ...");
         ros::Duration(3.0).sleep();
-        ROS_INFO("Done Clearing");
 
         // queuing action, should exit the state
         sm->postAction(Action{.id="trStopped"});
         return true;
       }, true); // true = runs asynchronously, use for blocking functions
-    }
+    },
+
+    // custom function invoked when the "st2Clearing" state is exited
+    [&]() -> bool{
+      return sm->addExitCallback("st2Clearing",[&process_app](){
+        ROS_INFO("Done Clearing, Process is now good to go ...");
+      });
+    },
   };
 
   // calling all functions and evaluating returned args

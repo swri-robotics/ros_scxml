@@ -2,6 +2,18 @@
 Lightweight finite state machine library that uses the [SCXML](https://commons.apache.org/proper/commons-scxml/guide/scxml-documents.html) standard
 
 ---
+## Prerequisites
+### QT 5
+  The QScxml library is only available from version Qt 5.7 and up, this implementation currently uses Qt 5.12.2 which
+  can be downloaded from [here](http://download.qt.io/official_releases/qt/5.12/5.12.2/).  Run the instalation script 
+  with root access and follow the on screen instructions.
+  In order for cmake to find the installed library you musth add the **cmake** directory to the **PATH** environment 
+  variable.  For instance if you installed QT in the `/opt/QT` system directory then you would add the path as follows:
+  ```
+  PATH="/opt/Qt/5.12.2/gcc_64/lib/cmake:$PATH"
+  ```
+
+---
 ## Demo program
 ### Description
 The `demo_scxml_state_machine` ROS node shows how to use the State Machine library with ROS and process specific code.  A key part of this code is in the section that adds custom functions that get invoked when specific states are entered or exited; inspect this section in order to understand how this is accomplished:

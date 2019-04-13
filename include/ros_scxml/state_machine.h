@@ -13,6 +13,7 @@
 #include <memory>
 #include <QScxmlStateMachine>
 #include <private/qscxmlstatemachineinfo_p.h>
+#include <private/qscxmlstatemachine_p.h>
 #include <QWidget>
 #include <QTimer>
 #include <QThread>
@@ -189,6 +190,7 @@ public:
   std::vector<std::string> getAvailableActions() const;
   std::vector<std::string> getActions(const std::string& state_name) const;
   std::string getCurrentState(bool full_name = false) const;
+  std::vector<std::string> getCurrentStates(bool full_name = false) const;
   std::vector<std::string> getStates(bool full_name = false) const;
   bool hasAction(const std::string& state_name, const Action& action);
   bool hasState(const std::string state_name);
@@ -215,11 +217,12 @@ protected:
   void signalSetup();
   Response executeAction(const Action& action);
   void processQueuedActions();
-  std::vector<std::string> getCurrentStates(bool full_name = false) const;
+  bool validateTransition(const Action& action) const;
 
   // state machine members
   QScxmlStateMachineInfo* sm_info_;
   QScxmlStateMachine* sm_;
+  QScxmlStateMachinePrivate* sm_private_;
   TransitionTable ttable_;
 
   // action buffer members
