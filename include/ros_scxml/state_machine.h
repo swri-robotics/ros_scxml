@@ -98,6 +98,7 @@ class StateMachine: public QObject
 {
 public:
 
+  typedef std::function< Response (const Action& ) > PreconditionCallback;
   typedef std::function< Response (const Action& ) > EntryCallback;
   typedef std::map<std::string,std::map<std::string,std::vector<std::string>>> TransitionTable;
 
@@ -167,6 +168,16 @@ public:
   void postAction(Action action);
 
   /**
+   * @brief adds a callback that gets invoked to check for pre-conditions prior to making a transition.
+   * When the callback returns a valid result then the transition proceeds, otherwise the transition is
+   * negated.
+   * @param st_name The name of the state
+   * @param cb      The callback to be invoked; it must be a non-blocking function.
+   * @return  True on success, false otherwise
+   */
+  bool addPreconditionCallback(const std::string& st_name,PreconditionCallback cb);
+
+  /**
    * @brief adds an callback that gets invoked when a state is entered
    * @param st_name         The name of the state
    * @param cb              The callback to be invoked; it can be a blocking function.
@@ -234,6 +245,7 @@ protected:
   QTimer* execute_action_timer_;
   mutable std::mutex execution_action_mutex_;
   std::atomic<bool> is_busy_;
+  std::map<std::string, PreconditionCallback> precond_callbacks_;
   std::map<std::string, EntryCbHandlerPtr> entry_callbacks_;
   std::map<std::string, std::function< void() > > exit_callbacks_;
   QThreadPool* async_thread_pool_;

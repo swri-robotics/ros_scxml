@@ -318,12 +318,31 @@ Response StateMachine::executeAction(const Action& action)
   }
 
   // finding target state
-  std::string target_state = ttable_[current_src_state].at(action.id).front();
-  if(target_state.empty())
+  std::vector<std::string> target_states = ttable_[current_src_state].at(action.id);
+  if(target_states.empty())
   {
-    res.msg = "Target state is invalid";
+    res.msg = boost::str(boost::format("No valid target states were found for transition %1% -> %2%") %
+                         current_src_state % action.id);
     res.success = false;
     return std::move(res);
+  }
+
+  // checking precondition
+  if(!std::all_of(target_states.begin(),target_states.end(),[&](const std::string& st) -> bool{
+    if(precond_callbacks_.count(st) == 0)
+    {
+      return true; // no precondition
+    }
+    res = precond_callbacks_[st](action);
+    if(!res)
+    {
+      res.msg = boost::str(boost::format("Precondition for state %s failed: %s") % st % res.msg);
+    }
+    return res;
+  }))
+  {
+    ROS_ERROR_STREAM(res.msg);
+    return std::move(res);  // precondition failed, not proceeding with transition
   }
 
   // submitting event
@@ -337,8 +356,8 @@ Response StateMachine::executeAction(const Action& action)
   {
     QCoreApplication::processEvents(QEventLoop::EventLoopExec, WAIT_QT_EVENTS);
     new_current_states = getCurrentStates();
-    if(std::any_of(new_current_states.begin(),new_current_states.end(),[&target_state](const std::string& st){
-      return target_state == st;
+    if(std::any_of(new_current_states.begin(),new_current_states.end(),[&target_states](const std::string& st){
+      return std::find(target_states.begin(),target_states.end(),st) != target_states.end();
     }))
     {
       transition_made = true;
@@ -349,14 +368,19 @@ Response StateMachine::executeAction(const Action& action)
   if(!transition_made)
   {
     sm_->cancelDelayedEvent(QString::fromStdString(action.id));
-    std::string states_str = std::accumulate(std::next(current_states.begin()),current_states.end(),
+    std::string current_states_str = std::accumulate(std::next(current_states.begin()),current_states.end(),
                                              current_states.front(),[](std::string r, const std::string& s){
       return r + ", " + s;
     });
-    res.msg = "SM timed out before finishing transition to state " + target_state;
+
+    std::string target_states_str = std::accumulate(std::next(target_states.begin()),target_states.end(),
+                                                    target_states.front(),[](std::string r, const std::string& s){
+      return r + ", " + s;
+    });
+    res.msg = "SM timed out before finishing transition to states [" + target_states_str + "]";
     res.success = false;
     ROS_ERROR_STREAM(res.msg);
-    ROS_ERROR("Current states are: %s",states_str.c_str());
+    ROS_ERROR("Current states are: %s",current_states_str.c_str());
     return std::move(res);
   }
 
@@ -390,6 +414,23 @@ Response StateMachine::executeAction(const Action& action)
   });
 
   return res;
+}
+
+bool StateMachine::addPreconditionCallback(const std::string& st_name, PreconditionCallback cb)
+{
+  if(!hasState(st_name))
+  {
+    ROS_ERROR("State %s was not found in SM",st_name.c_str());
+    return false;
+  }
+
+  if(precond_callbacks_.count(st_name) > 0)
+  {
+    ROS_WARN("Pre-condition callback for state %s will be replaced", st_name.c_str());
+  }
+  precond_callbacks_.insert(std::make_pair(st_name,cb));
+
+  return true;
 }
 
 bool StateMachine::addEntryCallback(const std::string& st_name, EntryCallback cb, bool async_execution)
@@ -612,3 +653,4 @@ bool StateMachine::validateTransition(const Action& action) const
 }
 
 } /* namespace ros_scxml */
+

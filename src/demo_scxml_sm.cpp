@@ -115,7 +115,13 @@ public:
   {
     ready_ = true;
     continue_process_ = true;
+    counter_ = 0;
     ROS_INFO_NAMED("Process","Reseted process variables");
+  }
+
+  int getCounter() const
+  {
+    return counter_;
   }
 
   /**
@@ -133,11 +139,11 @@ public:
     while(continue_process_ && ros::ok())
     {
       std_msgs::String msg;
-      msg.data = boost::str(boost::format("Executing process at time %f") % ros::Time::now().toSec());
+      msg.data = boost::str(boost::format("Incremented counter to %i") % counter_);
       process_msg_pub_.publish(msg);
       process_pause.sleep();
+      counter_++;
     }
-
     return true;
   }
 
@@ -154,6 +160,7 @@ protected:
   ros::Publisher process_msg_pub_;
   std::atomic<bool> continue_process_;
   std::atomic<bool> ready_;
+  int counter_;
 
 };
 
@@ -217,6 +224,21 @@ int main(int argc, char **argv)
     [&]() -> bool{
       return sm->addExitCallback("st3Execute",[&process_app](){
         process_app.haltProcess();
+      });
+    },
+
+    // custom function invoked prior to entering the "st3Completing" state
+    [&]() -> bool{
+      return sm->addPreconditionCallback("st3Completing",[&process_app](const Action& action) -> Response{
+        Response res;
+        static const int REQ_VAL = 16;
+        if(process_app.getCounter() >= REQ_VAL)
+        {
+          return true;
+        }
+        res.msg = boost::str(boost::format("Counter less than %i") % REQ_VAL);
+        res.success = false;
+        return res;
       });
     },
 
