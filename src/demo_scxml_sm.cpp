@@ -43,10 +43,25 @@ public:
         return;
       }
 
-      Response res = sm_->execute(Action{.id = msg->data});
-      if(res)
+      Response res = sm_->execute(Action{.id = msg->data,.data = ros::Time::now().toSec()});
+      if(!res)
       {
-        ROS_INFO("Action %s successfully executed",msg->data.c_str());
+        return;
+      }
+
+      ROS_INFO("Action %s successfully executed",msg->data.c_str());
+
+      // checking for returned data
+      if(!res.data.empty())
+      {
+        try
+        {
+          ROS_INFO_STREAM("Time value returned from state: "<< boost::any_cast<double>(res.data)<<" seconds");
+        }
+        catch(boost::bad_any_cast &e)
+        {
+          ROS_WARN_STREAM(e.what()<<": "<<res.data.type().name());
+        }
       }
     });
 
@@ -205,6 +220,21 @@ int main(int argc, char **argv)
     // custom function invoked when the "st3Reseting" state is entered
     [&]() -> bool{
       return sm->addEntryCallback("st3Reseting",[&](const Action& action) -> Response{
+
+        // checking passed user data first
+        if(!action.data.empty())
+        {
+          try
+          {
+            double secs = boost::any_cast<double>(action.data);
+            ROS_INFO("State received time value of %f seconds",secs);
+          }
+          catch(boost::bad_any_cast &e)
+          {
+            ROS_WARN_STREAM(e.what());
+          }
+        }
+
         process_app.resetProcess();
         ros::Duration(3.0).sleep();
         // queuing action, should exit the state
@@ -238,8 +268,19 @@ int main(int argc, char **argv)
         }
         res.msg = boost::str(boost::format("Counter less than %i") % REQ_VAL);
         res.success = false;
+
         return res;
       });
+    },
+
+    // custom function invoked when the "st3Completing" state is entered
+    [&]() -> bool{
+      return sm->addEntryCallback("st3Completing",[&process_app](const Action& action) -> Response{
+        Response res;
+        res.success = true;
+        res.data = ros::Time::now().toSec();
+        return std::move(res);
+      },false); // true = runs asynchronously, use for blocking functions
     },
 
     // custom function invoked when the "st2Clearing" state is entered, it will exit after waiting for 3 seconds

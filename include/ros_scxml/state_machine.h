@@ -48,7 +48,7 @@ struct Response
    * @param success   Set to true if the requested action was completed, use false otherwise.
    * @param data          Optional data that was generated from the requested transaction.
    */
-  Response(bool success = true, boost::any data = boost::none, std::string msg = ""):
+  Response(bool success = true, boost::any data = boost::any(), std::string msg = ""):
     success(success),
     data(data),
     msg(msg)

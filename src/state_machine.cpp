@@ -354,7 +354,7 @@ Response StateMachine::executeAction(const Action& action)
   std::vector<std::string> new_current_states;
   while(QTime::currentTime() < stop_time)
   {
-    QCoreApplication::processEvents(QEventLoop::EventLoopExec, WAIT_QT_EVENTS);
+    QCoreApplication::processEvents(QEventLoop::AllEvents, WAIT_QT_EVENTS);
     new_current_states = getCurrentStates();
     if(std::any_of(new_current_states.begin(),new_current_states.end(),[&target_states](const std::string& st){
       return std::find(target_states.begin(),target_states.end(),st) != target_states.end();
@@ -408,7 +408,7 @@ Response StateMachine::executeAction(const Action& action)
     responses.push_back(std::move(new_res));
   }
 
-  // choosing the rirst bad result if there is one
+  // choosing the first bad result if there is one
   res = std::accumulate(responses.begin(),responses.end(),responses.front(),[](Response result, const Response& r){
     return (!result) ? result : r;
   });
