@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" binding="early" xmlns:qt="http://www.qt.io/2015/02/scxml-ext" name="packml" qt:editorversion="4.7.84" initial="st1Faulted">
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" binding="early" xmlns:qt="http://www.qt.io/2015/02/scxml-ext" name="packml" qt:editorversion="4.8.2" initial="st1Faulted">
     <qt:editorinfo initialGeometry="283.44;885.89;-20;-20;40;40"/>
     <state id="st1Faulted">
         <qt:editorinfo scenegeometry="459.98;910.20;372.09;794.47;478.02;182.85" geometry="459.98;910.20;-87.89;-115.73;478.02;182.85"/>
@@ -17,10 +17,10 @@
     <state id="st1Operation" initial="st2Clearing">
         <qt:editorinfo scenegeometry="456.62;624.78;42.92;-37.88;1159.58;769.61" geometry="456.62;624.78;-413.70;-662.66;1159.58;769.61"/>
         <transition type="external" event="userAbort" target="st1Faulted">
-            <qt:editorinfo endTargetFactors="84.65;10.12" movePoint="15.24;3.05" startTargetFactors="64.49;90.34"/>
+            <qt:editorinfo movePoint="15.24;3.05" startTargetFactors="64.49;90.34" endTargetFactors="84.65;10.12"/>
         </transition>
         <state id="st2Process">
-            <qt:editorinfo scenegeometry="254.99;222.48;67.31;49.01;1115.19;453.85" geometry="-201.63;-402.30;-187.68;-173.47;1115.19;453.85"/>
+            <qt:editorinfo scenegeometry="252.80;222.48;65.12;49.01;1115.19;453.85" geometry="-203.82;-402.30;-187.68;-173.47;1115.19;453.85"/>
             <state id="st3Reseting">
                 <qt:editorinfo scenegeometry="151.37;428.71;91.37;378.71;136.21;100" geometry="-103.62;206.23;-60;-50;136.21;100"/>
                 <transition type="external" event="trIdle" target="st3Idle">
@@ -43,7 +43,7 @@
             <state id="st3Complete">
                 <qt:editorinfo scenegeometry="1024.03;277.34;964.03;227.34;120;100" geometry="769.04;54.86;-60;-50;120;100"/>
                 <transition type="external" event="trReset" target="st3Reseting">
-                    <qt:editorinfo startTargetFactors="52.99;90.28" localGeometry="0;148.68;-725.87;148.68"/>
+                    <qt:editorinfo localGeometry="0.02;148.68;-725.85;148.68" startTargetFactors="52.99;90.28"/>
                 </transition>
             </state>
             <state id="st3Execute">
@@ -80,16 +80,9 @@
             </state>
             <state id="st3Suspended">
                 <qt:editorinfo scenegeometry="583.13;402.30;523.13;352.30;120;100" geometry="328.14;179.82;-60;-50;120;100"/>
-                <transition type="external" event="userUnsuspend" target="st3Unsuspending"/>
-            </state>
-            <state id="st3Unsuspending">
-                <qt:editorinfo scenegeometry="364.71;402.30;304.71;352.30;120;100" geometry="109.72;179.82;-60;-50;120;100"/>
-                <transition type="external" event="trExecute" target="st3Execute">
-                    <qt:editorinfo movePoint="67.05;22.35"/>
+                <transition type="external" event="trReset" target="st3Reseting">
+                    <qt:editorinfo endTargetFactors="88.67;26.23"/>
                 </transition>
-                <onentry>
-                    <send event="startUnsuspending"/>
-                </onentry>
             </state>
             <state id="st3Starting">
                 <qt:editorinfo scenegeometry="364.71;277.34;304.71;227.34;120;100" geometry="109.72;54.86;-60;-50;120;100"/>
@@ -97,10 +90,19 @@
                     <qt:editorinfo movePoint="14.22;11.17"/>
                 </transition>
             </state>
+            <transition type="external" event="pause" target="st2Pause" cond="In(st3Execute)">
+                <qt:editorinfo movePoint="23.58;2.14" startTargetFactors="86.53;97.62" endTargetFactors="56.31;16.73"/>
+            </transition>
+            <history type="shallow" id="History_1">
+                <qt:editorinfo scenegeometry="932.66;364.48;912.66;344.48;40;40" geometry="677.67;142;-20;-20;40;40"/>
+            </history>
         </state>
         <state id="st2Stopping">
-            <qt:editorinfo scenegeometry="511;598.36;451;548.36;120;100" geometry="54.38;-26.42;-60;-50;120;100"/>
+            <qt:editorinfo scenegeometry="599.98;595.15;539.98;545.15;120;100" geometry="143.36;-29.63;-60;-50;120;100"/>
             <transition type="external" event="trStopped" target="st2Stopped"/>
+            <onentry>
+                <send event="trStopped" delay="3"/>
+            </onentry>
         </state>
         <state id="st2Clearing">
             <qt:editorinfo scenegeometry="733.59;661.73;673.59;611.73;157.55;100" geometry="276.97;36.95;-60;-50;157.55;100"/>
@@ -112,6 +114,12 @@
             <qt:editorinfo scenegeometry="177.78;591.26;117.78;541.26;120;113.98" geometry="-278.84;-33.52;-60;-50;120;113.98"/>
             <transition type="external" event="userReset" target="st2Process">
                 <qt:editorinfo endTargetFactors="9.92;94.61"/>
+            </transition>
+        </state>
+        <state id="st2Pause">
+            <qt:editorinfo scenegeometry="1024.85;618.56;964.85;568.56;120;100" geometry="568.23;-6.22;-60;-50;120;100"/>
+            <transition type="external" event="resume" target="History_1">
+                <qt:editorinfo startTargetFactors="8.93;19.25" endTargetFactors="48.07;71.26"/>
             </transition>
         </state>
     </state>

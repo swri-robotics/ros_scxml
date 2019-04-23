@@ -21,6 +21,7 @@ namespace ros_scxml
 using SM = QScxmlStateMachine;
 using SMInfo = QScxmlStateMachineInfo;
 using TransitionEventsMap = std::map<std::string,std::vector<std::string>>;
+using TransitionTable = std::map<std::string,std::map<std::string,std::vector<std::string>>>;
 
 class ScopeExit
 {
@@ -58,9 +59,9 @@ std::string getStateFullName(const QScxmlStateMachineInfo* sm_info, const QScxml
   return std::move(full_name);
 }
 
-StateMachine::TransitionTable buildTransitionTable(const QScxmlStateMachineInfo* sm_info)
+TransitionTable buildTransitionTable(const QScxmlStateMachineInfo* sm_info)
 {
-  StateMachine::TransitionTable table;
+  TransitionTable table;
   QVector<QScxmlStateMachineInfo::TransitionId> transitions = sm_info->allTransitions();
   for(std::size_t i = 0; i < transitions.size(); i++)
   {
@@ -159,9 +160,12 @@ StateMachine::StateMachine(QScxmlStateMachine* sm, double event_loop_period):
   sm_private_(QScxmlStateMachinePrivate::get(sm)),
   sm_info_(new QScxmlStateMachineInfo(sm)),
   event_loop_period_(event_loop_period),
-  async_thread_pool_(new QThreadPool(this)),
-  ttable_(buildTransitionTable(sm_info_))
+  async_thread_pool_(new QThreadPool(this))
 {
+  QVector<QScxmlStateMachineInfo::StateId> states = sm_info_->allStates();
+  std::for_each(states.begin(),states.end(),[&](const int& id){
+    st_ids_map_.insert(std::make_pair(sm_info_->stateName(id).toStdString(),id));
+  });
   signalSetup();
 }
 
@@ -194,8 +198,10 @@ bool StateMachine::loadFile(const std::string& filename)
 
   sm_info_ = new QScxmlStateMachineInfo(sm_);
   sm_private_ = QScxmlStateMachinePrivate::get(sm_);
-
-  ttable_ = buildTransitionTable(sm_info_);
+  QVector<QScxmlStateMachineInfo::StateId> states = sm_info_->allStates();
+  std::for_each(states.begin(),states.end(),[&](const int& id){
+    st_ids_map_.insert(std::make_pair(sm_info_->stateName(id).toStdString(),id));
+  });
   signalSetup();
   return true;
 }
@@ -294,22 +300,102 @@ void StateMachine::processQueuedActions()
   return;
 }
 
+void StateMachine::saveStateHistory()
+{
+  QVector<int> current_st_ids = sm_info_->configuration();
+  const QScxmlExecutableContent::StateTable *state_table = sm_private_->m_stateTable;
+  for(const int& id: current_st_ids)
+  {
+    const QScxmlExecutableContent::StateTable::Array children_st_ids = state_table->array(
+        state_table->state(id).childStates);
+
+    if(!children_st_ids.isValid())
+    {
+      continue;
+    }
+
+    // getting history states
+    for (int k : children_st_ids)
+    {
+      std::vector<int> history_states;
+      if (state_table->state(k).isHistoryState())
+      {
+
+        for(const int& s_id : current_st_ids)
+        {
+          if(!state_table->state(s_id).isAtomic())
+          {
+            continue;
+          }
+
+          if(sm_info_->stateParent(s_id) != id)
+          {
+            continue;
+          }
+
+          ROS_INFO_STREAM("Saved History state "<<sm_info_->stateName(s_id).toStdString());
+          history_states.push_back(s_id);
+        }
+
+      }
+
+      if(history_states.empty())
+      {
+        continue;
+      }
+
+      history_buffer_[k] = history_states;
+    }
+  }
+}
+
+void StateMachine::clearStateHistory()
+{
+  QVector<int> current_st_ids = sm_info_->configuration();
+  const QScxmlExecutableContent::StateTable *state_table = sm_private_->m_stateTable;
+  for(const int& id: current_st_ids)
+  {
+    const QScxmlExecutableContent::StateTable::Array children_st_ids = state_table->array(
+        state_table->state(id).childStates);
+
+    if(!children_st_ids.isValid())
+    {
+      continue;
+    }
+
+    // getting history states
+    for (int k : children_st_ids)
+    {
+      if (state_table->state(k).isHistoryState() &&
+          state_table->state(k).type == QScxmlExecutableContent::StateTable::State::DeepHistory &&
+          history_buffer_.count(k) > 0)
+      {
+        history_buffer_.erase(k);
+      }
+    }
+  }
+}
+
 Response StateMachine::executeAction(const Action& action)
 {
   std::lock_guard<std::mutex> lock(execution_action_mutex_);
   ScopeExit scope_exit(&this->is_busy_); // sets the flag to busy
 
   Response res;
-  std::vector<std::string> current_states = getCurrentStates();
-  std::string current_src_state;
-  if(!std::any_of(current_states.begin(), current_states.end(),[&](const std::string& st){
-    if(hasAction(st,action) && validateTransition(action))
-    {
-      current_src_state = st;
-      return true;
-    }
-    return false;
-  }))
+
+  // get transitions and check their events
+  std::vector<int> transition_ids = getValidTransitionIDs();
+
+  // filter transitions
+  transition_ids.erase(std::remove_if(transition_ids.begin(),transition_ids.end(),[&](const int& t_id){
+    QVector<QString> events = sm_info_->transitionEvents(t_id);
+    return !std::any_of(events.begin(),events.end(),[&action](QString& s){
+      return s.toStdString() == action.id;
+    });
+  }),transition_ids.end());
+
+  // check if valid transitions remain
+  if(transition_ids.empty())
   {
     res.msg = boost::str(boost::format("Action '%s' is not valid for any of the active states") % action.id);
     res.success = false;
@@ -317,18 +403,43 @@ Response StateMachine::executeAction(const Action& action)
     return std::move(res);
   }
 
-  // finding target state
-  std::vector<std::string> target_states = ttable_[current_src_state].at(action.id);
-  if(target_states.empty())
+  int current_src_st_id = sm_info_->transitionSource(transition_ids.front());
+  std::string current_src_st_name = sm_info_->stateName(current_src_st_id).toStdString();
+
+  // finding target states
+  std::vector<int> target_state_ids;
+  std::for_each(transition_ids.begin(),transition_ids.end(),[&](const int& t_id){
+    QVector<QScxmlStateMachineInfo::StateId> st_ids = sm_info_->transitionTargets(t_id);
+    for(const int& st_id: st_ids)
+    {
+      if(sm_private_->m_stateTable->state(st_id).isHistoryState())
+      {
+        // check history buffer
+        if(history_buffer_.count(st_id)>0)
+        {
+          target_state_ids.insert(target_state_ids.end(),
+                                  history_buffer_.at(st_id).begin(), history_buffer_.at(st_id).end());
+        }
+      }
+      else
+      {
+        target_state_ids.push_back(st_id);
+      }
+    }
+  });
+
+
+  if(target_state_ids.empty())
   {
     res.msg = boost::str(boost::format("No valid target states were found for transition %1% -> %2%") %
-                         current_src_state % action.id);
+                         current_src_st_name % action.id);
     res.success = false;
     return std::move(res);
   }
 
   // checking precondition
-  if(!std::all_of(target_states.begin(),target_states.end(),[&](const std::string& st) -> bool{
+  if(!std::all_of(target_state_ids.begin(),target_state_ids.end(),[&](const int& st_id) -> bool{
+    std::string st = sm_info_->stateName(st_id).toStdString();
     if(precond_callbacks_.count(st) == 0)
     {
       return true; // no precondition
@@ -345,19 +456,22 @@ Response StateMachine::executeAction(const Action& action)
     return std::move(res);  // precondition failed, not proceeding with transition
   }
 
+  // clear history before transitioning
+  clearStateHistory();
+
   // submitting event
   sm_->submitEvent(QString::fromStdString(action.id));
 
   // wait until QT makes the transition to the target state
   QTime stop_time = QTime::currentTime().addMSecs(WAIT_TRANSITION_PERIOD);
   bool transition_made = false;
-  std::vector<std::string> new_current_states;
+  QVector<QScxmlStateMachineInfo::StateId> current_st_ids;
   while(QTime::currentTime() < stop_time)
   {
     QCoreApplication::processEvents(QEventLoop::AllEvents, WAIT_QT_EVENTS);
-    new_current_states = getCurrentStates();
-    if(std::any_of(new_current_states.begin(),new_current_states.end(),[&target_states](const std::string& st){
-      return std::find(target_states.begin(),target_states.end(),st) != target_states.end();
+    current_st_ids = sm_info_->configuration();
+    if(std::any_of(current_st_ids.begin(),current_st_ids.end(),[&target_state_ids](const int& st_id){
+      return std::find(target_state_ids.begin(),target_state_ids.end(),st_id) != target_state_ids.end();
     }))
     {
       transition_made = true;
@@ -368,15 +482,18 @@ Response StateMachine::executeAction(const Action& action)
   if(!transition_made)
   {
     sm_->cancelDelayedEvent(QString::fromStdString(action.id));
-    std::string current_states_str = std::accumulate(std::next(current_states.begin()),current_states.end(),
-                                             current_states.front(),[](std::string r, const std::string& s){
-      return r + ", " + s;
+    std::string current_states_str = std::accumulate(std::next(current_st_ids.begin()),current_st_ids.end(),
+                                                     sm_info_->stateName(current_st_ids.front()).toStdString(),
+                                                                         [&](std::string r, const int& s){
+      return r + ", " + sm_info_->stateName(s).toStdString();
     });
 
-    std::string target_states_str = std::accumulate(std::next(target_states.begin()),target_states.end(),
-                                                    target_states.front(),[](std::string r, const std::string& s){
-      return r + ", " + s;
+    std::string target_states_str = std::accumulate(std::next(target_state_ids.begin()),target_state_ids.end(),
+                                                    sm_info_->stateName(target_state_ids.front()).toStdString(),
+                                                    [&](std::string r, const int& s){
+      return r + ", " + sm_info_->stateName(s).toStdString();
     });
+
     res.msg = "SM timed out before finishing transition to states [" + target_states_str + "]";
     res.success = false;
     ROS_ERROR_STREAM(res.msg);
@@ -384,36 +501,30 @@ Response StateMachine::executeAction(const Action& action)
     return std::move(res);
   }
 
-  // calling entry callback
-  res.success = true;
-  std::vector<Response> responses;
-  std::reverse(std::begin(new_current_states),std::end(new_current_states));
-  for(const std::string& st : new_current_states)
+  // save history
+  saveStateHistory();
+
+  // calling entry callbacks
+  for(int id: current_st_ids)
   {
-    Response new_res;
-    if(entry_callbacks_.count(st) > 0)
+    Response st_res;
+    const std::string& st_name = sm_info_->stateName(id).toStdString();
+    if(entry_callbacks_.count(st_name) > 0)
     {
-      new_res = (*entry_callbacks_.at(st))(action);
+      st_res = (*entry_callbacks_.at(st_name))(action);
     }
     else
     {
-      new_res.success = true;
+      st_res.success = true;
     }
 
-    if(!new_res)
+    if(sm_private_->m_stateTable->state(id).isAtomic())
     {
-      ROS_ERROR_STREAM(res.msg);
+      res = std::move(st_res);
     }
-
-    responses.push_back(std::move(new_res));
   }
 
-  // choosing the first bad result if there is one
-  res = std::accumulate(responses.begin(),responses.end(),responses.front(),[](Response result, const Response& r){
-    return (!result) ? result : r;
-  });
-
-  return res;
+  return std::move(res);
 }
 
 bool StateMachine::addPreconditionCallback(const std::string& st_name, PreconditionCallback cb)
@@ -467,34 +578,35 @@ bool StateMachine::addExitCallback(const std::string& st_name, std::function<voi
 
 std::vector<std::string> StateMachine::getAvailableActions() const
 {
-  QVector<SMInfo::StateId> state_ids = sm_info_->configuration();
   std::vector<std::string> action_ids = {};
-  for(SMInfo::StateId id : state_ids)
-  {
-    std::vector<std::string> st_actions = getActions(sm_info_->stateName(id).toStdString());
-    action_ids.insert(action_ids.end(),st_actions.begin(),st_actions.end());
-  }
+  std::vector<int> transition_ids = getValidTransitionIDs();
 
-  action_ids.erase(std::remove_if(action_ids.begin(),action_ids.end(),[this](const std::string& id){
-    return !validateTransition(Action{.id = id});
-  }),action_ids.end());
+  for(int t_id: transition_ids)
+  {
+    QVector<QString> event_names = sm_info_->transitionEvents(t_id);
+    std::transform(event_names.begin(),event_names.end(),std::back_inserter(action_ids),[](const QString& s){
+      return s.toStdString();
+    });
+  }
   return std::move(action_ids);
 }
 
 std::vector<std::string> StateMachine::getActions(const std::string& state_name) const
 {
-
   std::vector<std::string> action_ids = {};
-  if(ttable_.count(state_name) == 0)
+  if(st_ids_map_.count(state_name)==0)
   {
     return {};
   }
 
-  const TransitionEventsMap& transitions_map = ttable_.at(state_name);
-  std::transform(transitions_map.begin(),transitions_map.end(),std::back_inserter(action_ids),
-                 [](const TransitionEventsMap::value_type& kv){
-    return kv.first;
-  });
+  std::vector<int> transition_ids = getTransitionsIDs({st_ids_map_.at(state_name)});
+  for(int t_id : transition_ids)
+  {
+    QVector<QString> event_names = sm_info_->transitionEvents(t_id);
+    std::transform(event_names.begin(),event_names.end(),std::back_inserter(action_ids),[](QString& s){
+      return s.toStdString();
+    });
+  }
   return std::move(action_ids);
 }
 
@@ -578,10 +690,12 @@ bool StateMachine::isRunning() const
 void StateMachine::signalSetup()
 {
   connect(sm_info_,&SMInfo::statesEntered,[this](const QVector<QScxmlStateMachineInfo::StateId>& states){
+
     for(const QScxmlStateMachineInfo::StateId& id : states)
     {
       emit this->state_entered(getStateFullName(sm_info_,id));
     }
+
   });
 
   connect(sm_info_,&SMInfo::statesExited,[this](const QVector<QScxmlStateMachineInfo::StateId>& states){
@@ -602,54 +716,58 @@ void StateMachine::signalSetup()
   });
 }
 
-bool StateMachine::validateTransition(const Action& action) const
+std::vector<int> StateMachine::getTransitionsIDs(const QVector<int>& states) const
 {
   using StateTable = QScxmlExecutableContent::StateTable;
-  QVector<SMInfo::StateId> states = sm_info_->configuration();
   const StateTable* st_table = sm_private_->m_stateTable;
   QScxmlDataModel* data_model = sm_private_->m_dataModel;
-  bool valid = false;
-  for(SMInfo::StateId& id: states)
+
+  std::vector<int> transition_ids;
+  for(const int& id: states)
   {
-    const StateTable::Array transitions = st_table->array(st_table->state(id).transitions);
-    if (!transitions.isValid())
+    StateTable::Array st_transitions = st_table->array(st_table->state(id).transitions);
+    if (!st_transitions.isValid())
     {
         continue;
     }
-    std::vector<int> sorted_transitions(transitions.size(), -1);
-    std::copy(transitions.begin(), transitions.end(), sorted_transitions.begin());
-    int selected_tr_id = StateTable::InvalidIndex;
-    for (int tr_id : sorted_transitions)
+
+    transition_ids.insert(transition_ids.end(),st_transitions.begin(),st_transitions.end());
+  }
+
+  return std::move(transition_ids);
+}
+
+std::vector<int> StateMachine::getValidTransitionIDs() const
+{
+  using StateTable = QScxmlExecutableContent::StateTable;
+  std::vector<std::string> action_names = {};
+
+  const StateTable* st_table = sm_private_->m_stateTable;
+  QScxmlDataModel* data_model = sm_private_->m_dataModel;
+  const std::vector<int> transition_ids = getTransitionsIDs(sm_info_->configuration());
+  std::vector<int> valid_transition_ids;
+  if(transition_ids.empty())
+  {
+    return {};
+  }
+
+  for(const int& t_id : transition_ids)
+  {
+    const StateTable::Transition &t = st_table->transition(t_id);
+    bool cond_valid = t.condition == -1;
+    if(t.condition != -1 )
     {
-      QVector<QString> event_names = sm_info_->transitionEvents(tr_id);
-      if(std::any_of(event_names.begin(),event_names.end(),[&action](QString& n){
-        return n.toStdString() == action.id;
-      }))
-      {
-        selected_tr_id = tr_id;
-        break;
-      }
+      cond_valid = data_model->evaluateToBool(t.condition, &cond_valid) && cond_valid;
     }
 
-    if(selected_tr_id == -1)
+    if(!cond_valid)
     {
       continue;
     }
 
-    const StateTable::Transition &t = st_table->transition(selected_tr_id);
-    if (t.condition == -1)
-    {
-      valid = true; // no condition assigned
-    }
-    else
-    {
-      bool ok = false;
-      valid = data_model->evaluateToBool(t.condition, &ok) && ok;
-    }
-    break;
+    valid_transition_ids.push_back(t_id);
   }
-
-  return valid;
+  return std::move(valid_transition_ids);
 }
 
 } /* namespace ros_scxml */

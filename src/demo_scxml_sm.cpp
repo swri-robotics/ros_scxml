@@ -151,6 +151,7 @@ public:
     }
 
     ros::Duration process_pause(2.0);
+    continue_process_ = true;
     while(continue_process_ && ros::ok())
     {
       std_msgs::String msg;
@@ -160,6 +161,11 @@ public:
       counter_++;
     }
     return true;
+  }
+
+  void pauseProcess()
+  {
+    continue_process_= false;
   }
 
   void haltProcess()
@@ -253,7 +259,8 @@ int main(int argc, char **argv)
     // custom function invoked when the "st3Execute" state is exited
     [&]() -> bool{
       return sm->addExitCallback("st3Execute",[&process_app](){
-        process_app.haltProcess();
+        process_app.pauseProcess();
+        ROS_INFO_STREAM("Process counter at "<<process_app.getCounter());
       });
     },
 
@@ -271,6 +278,21 @@ int main(int argc, char **argv)
 
         return res;
       });
+    },
+
+    // custom function invoked when the "st3Suspending" state is entered
+    [&]() -> bool{
+      return sm->addEntryCallback("st3Suspending",[&](const Action& action) -> Response{
+        ROS_INFO("Suspending process");
+        process_app.haltProcess();
+        ros::Duration(3.0).sleep();
+
+        // queuing action, should exit the state
+        sm->postAction(Action{.id="trSuspending"});
+        Response res;
+        res.success = true;
+        return std::move(res);
+      },true); // true = runs asynchronously, use for blocking functions
     },
 
     // custom function invoked when the "st3Completing" state is entered

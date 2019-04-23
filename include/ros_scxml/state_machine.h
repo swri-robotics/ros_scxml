@@ -92,16 +92,12 @@ struct Response
   std::string msg;
 };
 
-
-
 class StateMachine: public QObject
 {
 public:
 
   typedef std::function< Response (const Action& ) > PreconditionCallback;
   typedef std::function< Response (const Action& ) > EntryCallback;
-  typedef std::map<std::string,std::map<std::string,std::vector<std::string>>> TransitionTable;
-
 
 private:
 
@@ -228,15 +224,19 @@ protected:
   void signalSetup();
   Response executeAction(const Action& action);
   void processQueuedActions();
-  bool validateTransition(const Action& action) const;
+  std::vector<int> getTransitionsIDs(const QVector<int>& states) const;
+  std::vector<int>  getValidTransitionIDs() const;
+  void saveStateHistory();
+  void clearStateHistory();
 
   // state machine members
   QScxmlStateMachineInfo* sm_info_;
   QScxmlStateMachine* sm_;
   QScxmlStateMachinePrivate* sm_private_;
-  TransitionTable ttable_;
+  std::map<std::string,int> st_ids_map_;
+  std::map<int, std::vector<int> > history_buffer_;
 
-  // action buffer members
+  // action queue members
   mutable std::mutex action_queue_mutex_;
   std::list<Action> action_queue_;
 
@@ -245,6 +245,7 @@ protected:
   QTimer* execute_action_timer_;
   mutable std::mutex execution_action_mutex_;
   std::atomic<bool> is_busy_;
+  std::atomic<bool> all_states_entered_;
   std::map<std::string, PreconditionCallback> precond_callbacks_;
   std::map<std::string, EntryCbHandlerPtr> entry_callbacks_;
   std::map<std::string, std::function< void() > > exit_callbacks_;
