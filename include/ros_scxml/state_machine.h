@@ -14,7 +14,6 @@
 #include <QScxmlStateMachine>
 #include <private/qscxmlstatemachineinfo_p.h>
 #include <private/qscxmlstatemachine_p.h>
-#include <QWidget>
 #include <QTimer>
 #include <QThread>
 #include <QThreadPool>

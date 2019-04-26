@@ -20,15 +20,17 @@ find_package(Qt5 REQUIRED COMPONENTS
   Scxml
 )
 
-
 catkin_package(
   INCLUDE_DIRS
-    include
+    include   
+    ${Qt5Core_INCLUDE_DIRS}
+    ${Qt5Widgets_INCLUDE_DIRS}
+    ${Qt5Scxml_INCLUDE_DIRS}
+    ${Qt5Scxml_PRIVATE_INCLUDE_DIRS}
   LIBRARIES
-    ${PROJECT_NAME}
+    ${PROJECT_NAME}    
   CATKIN_DEPENDS
     roscpp
-    std_msgs
   DEPENDS
     Qt5Core
     Qt5Widgets
@@ -72,8 +74,5 @@ add_executable(demo_scxml_state_machine
 target_link_libraries(demo_scxml_state_machine
   ${catkin_LIBRARIES}
   ${PROJECT_NAME}
-  ${Qt5Core_LIBRARIES}
-  ${Qt5Widgets_LIBRARIES}
-  ${Qt5Scxml_LIBRARIES}
 )
 
