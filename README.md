@@ -7,10 +7,11 @@ Lightweight finite state machine library that uses the [SCXML](https://commons.a
   The QScxml library is only available from version Qt 5.7 and up, this implementation currently uses Qt 5.12.2 which
   can be downloaded from [here](http://download.qt.io/official_releases/qt/5.12/5.12.2/).  Run the instalation script 
   with root access and follow the on screen instructions.
-  In order for cmake to find the installed library you musth add the **cmake** directory to the **PATH** environment 
-  variable.  For instance if you installed QT in the `/opt/QT` system directory then you would add the path as follows:
+  In order properly configure this library for cmake and so that it can be used as a shared library then the `PATH` and `LD_LIBRARY_PATH` 
+  must be set.  For instance if you installed QT in the `/opt/QT` system directory then you would add set the variables as follows:
   ```
-  PATH="/opt/Qt/5.12.2/gcc_64/lib/cmake:$PATH"
+  export PATH="/opt/Qt/5.12.2/gcc_64/lib/cmake:$PATH"
+  export LD_LIBRARY_PATH=/opt/Qt/5.12.2/gcc_64/lib:$LD_LIBRARY_PATH
   ```
 
 ---
