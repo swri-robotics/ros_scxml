@@ -12,8 +12,8 @@
 #include <boost/format.hpp>
 #include <ros/console.h>
 
-static const int WAIT_TRANSITION_PERIOD = 500; // ms
-static const int WAIT_QT_EVENTS = WAIT_TRANSITION_PERIOD/10.0; // ms
+static const int WAIT_TRANSITION_PERIOD = 1000; // ms
+static const int WAIT_QT_EVENTS = WAIT_TRANSITION_PERIOD/40.0; // ms
 
 namespace ros_scxml
 {
@@ -280,7 +280,6 @@ bool StateMachine::wait(double timeout) const
 void StateMachine::processQueuedActions()
 {
   using namespace boost;
-  std::lock_guard<std::mutex> lock(action_queue_mutex_);
 
   if(is_busy_)
   {
@@ -288,13 +287,22 @@ void StateMachine::processQueuedActions()
     return;
   }
 
-  if(action_queue_.empty())
+  if(emitStateEnteredSignal())
   {
-    return;
+    return; // allow for listeners to handle signal
   }
 
-  auto action  = action_queue_.front();
-  action_queue_.pop_front();
+  Action action;
+  {
+    std::lock_guard<std::mutex> lock(action_queue_mutex_);
+    if(action_queue_.empty())
+    {
+      return;
+    }
+
+    action  = action_queue_.front();
+    action_queue_.pop_front();
+  }
   Response res = executeAction(action);
 
   return;
@@ -687,13 +695,32 @@ bool StateMachine::isRunning() const
   return sm_->isRunning();
 }
 
+bool StateMachine::emitStateEnteredSignal()
+{
+  bool emitted = false;
+  std::lock_guard<std::mutex> lock(entered_states_mutex_);
+  while(!entered_states_queue_.empty())
+  {
+    emitted = true;
+    QScxmlStateMachineInfo::StateId id = entered_states_queue_.front();
+    entered_states_queue_.pop_front();
+    const std::string state_name = getStateFullName(sm_info_,id);
+    ROS_DEBUG("Emitting state_entered signal for state %s",state_name.c_str());
+    QTimer::singleShot(10,[&,state_name](){
+      emit this->state_entered(state_name);
+    });
+  }
+  return emitted;
+}
+
 void StateMachine::signalSetup()
 {
   connect(sm_info_,&SMInfo::statesEntered,[this](const QVector<QScxmlStateMachineInfo::StateId>& states){
-
+    std::lock_guard<std::mutex> lock(entered_states_mutex_);
+    entered_states_queue_.clear();
     for(const QScxmlStateMachineInfo::StateId& id : states)
     {
-      emit this->state_entered(getStateFullName(sm_info_,id));
+      entered_states_queue_.push_back(id); // will emit entered signals from the processing thread
     }
 
   });

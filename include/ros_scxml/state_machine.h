@@ -11,6 +11,7 @@
 #include <list>
 #include <mutex>
 #include <memory>
+#include <deque>
 #include <QScxmlStateMachine>
 #include <private/qscxmlstatemachineinfo_p.h>
 #include <private/qscxmlstatemachine_p.h>
@@ -221,6 +222,7 @@ public:
 protected:
 
   void signalSetup();
+  bool emitStateEnteredSignal();
   Response executeAction(const Action& action);
   void processQueuedActions();
   std::vector<int> getTransitionsIDs(const QVector<int>& states) const;
@@ -249,6 +251,8 @@ protected:
   std::map<std::string, EntryCbHandlerPtr> entry_callbacks_;
   std::map<std::string, std::function< void() > > exit_callbacks_;
   QThreadPool* async_thread_pool_;
+  mutable std::mutex entered_states_mutex_;
+  std::deque<QScxmlStateMachineInfo::StateId> entered_states_queue_;
 
 };
 
