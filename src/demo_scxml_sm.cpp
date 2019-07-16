@@ -5,6 +5,7 @@
 #include <std_msgs/String.h>
 #include <QApplication>
 #include "ros_scxml/state_machine.h"
+#include <boost/format.hpp>
 
 static const std::string CURRENT_STATE_TOPIC = "current_state";
 static const std::string EXECUTE_ACTION_TOPIC = "execute_action";
