@@ -394,12 +394,10 @@ Response StateMachine::executeAction(const Action& action)
   // get transitions and check their events
   std::vector<int> transition_ids = getValidTransitionIDs();
 
-  // filter transitions
+  // filter transitions in order to keep those caused by the requested action
   transition_ids.erase(std::remove_if(transition_ids.begin(),transition_ids.end(),[&](const int& t_id){
     QVector<QString> events = sm_info_->transitionEvents(t_id);
-    return !std::any_of(events.begin(),events.end(),[&action](QString& s){
-      return s.toStdString() == action.id;
-    });
+    return std::find(events.begin(),events.end(),QString::fromStdString(action.id)) == events.end();
   }),transition_ids.end());
 
   // check if valid transitions remain
@@ -478,11 +476,18 @@ Response StateMachine::executeAction(const Action& action)
   {
     QCoreApplication::processEvents(QEventLoop::AllEvents, WAIT_QT_EVENTS);
     current_st_ids = sm_info_->configuration();
-    if(std::any_of(current_st_ids.begin(),current_st_ids.end(),[&target_state_ids](const int& st_id){
-      return std::find(target_state_ids.begin(),target_state_ids.end(),st_id) != target_state_ids.end();
-    }))
+    transition_made = std::any_of(current_st_ids.begin(),current_st_ids.end(),[&](const int& st_id){
+          return std::find(target_state_ids.begin(),
+                           target_state_ids.end(),st_id) != target_state_ids.end();
+    });
+
+    // check that an atomic state is active
+    transition_made &= std::any_of(current_st_ids.begin(),current_st_ids.end(),[&](const int& st_id){
+      return sm_private_->m_stateTable->state(st_id).isAtomic();
+    });
+
+    if(transition_made)
     {
-      transition_made = true;
       break;
     }
   }
@@ -624,8 +629,7 @@ std::string StateMachine::getCurrentState(bool full_name) const
   SMInfo::StateId current_st_id = state_ids.front();
   for(SMInfo::StateId id : state_ids)
   {
-    QVector<SMInfo::StateId> children = sm_info_->stateChildren(id);
-    if(children.empty())
+    if(sm_private_->m_stateTable->state(id).isAtomic())
     {
       current_st_id = id;
       break;
