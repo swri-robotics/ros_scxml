@@ -10,10 +10,25 @@
 #include <QTime>
 #include <QEventLoop>
 #include <boost/format.hpp>
-#include <ros/console.h>
+#include <log4cxx/basicconfigurator.h>
+#include <log4cxx/patternlayout.h>
+#include <log4cxx/consoleappender.h>
 
 static const int WAIT_TRANSITION_PERIOD = 1000; // ms
 static const int WAIT_QT_EVENTS = WAIT_TRANSITION_PERIOD/40.0; // ms
+
+log4cxx::LoggerPtr createConsoleLogger(const std::string& logger_name)
+{
+  using namespace log4cxx;
+  PatternLayoutPtr pattern_layout(new PatternLayout( "[\%-5p] [\%c](L:\%L): \%m\%n"));
+  ConsoleAppenderPtr console_appender(new ConsoleAppender(pattern_layout));
+  log4cxx::LoggerPtr logger(Logger::getLogger(logger_name));
+  logger->addAppender(console_appender);
+  logger->setLevel(Level::getInfo());
+  return logger;
+}
+
+static log4cxx::LoggerPtr DEFAULT_LOGGER = createConsoleLogger("Default");
 
 namespace ros_scxml
 {
@@ -146,21 +161,23 @@ TransitionTable buildTransitionTable(const QScxmlStateMachineInfo* sm_info)
   return std::move(table);
 }
 
-StateMachine::StateMachine(double event_loop_period):
+StateMachine::StateMachine(double event_loop_period, log4cxx::LoggerPtr logger):
   sm_(nullptr),
   sm_info_(nullptr),
   event_loop_period_(event_loop_period),
-  async_thread_pool_(new QThreadPool(this))
+  async_thread_pool_(new QThreadPool(this)),
+  logger_(logger ? logger : DEFAULT_LOGGER)
 {
 
 }
 
-StateMachine::StateMachine(QScxmlStateMachine* sm, double event_loop_period):
+StateMachine::StateMachine(QScxmlStateMachine* sm, double event_loop_period, log4cxx::LoggerPtr logger):
   sm_(sm),
   sm_private_(QScxmlStateMachinePrivate::get(sm)),
   sm_info_(new QScxmlStateMachineInfo(sm)),
   event_loop_period_(event_loop_period),
-  async_thread_pool_(new QThreadPool(this))
+  async_thread_pool_(new QThreadPool(this)),
+  logger_(logger ? logger : DEFAULT_LOGGER)
 {
   QVector<QScxmlStateMachineInfo::StateId> states = sm_info_->allStates();
   std::for_each(states.begin(),states.end(),[&](const int& id){
@@ -187,14 +204,10 @@ bool StateMachine::loadFile(const std::string& filename)
   {
     for (const QScxmlError &error : errors)
     {
-
-      ROS_ERROR("SCXML Parser [%s]: [%s]",
-                filename.c_str(),
-                error.toString().toStdString().c_str());
+      LOG4CXX_ERROR(logger_,"SCXML Parser " << filename << error.toString().toStdString());
     }
     return false;
   }
-
 
   sm_info_ = new QScxmlStateMachineInfo(sm_);
   sm_private_ = QScxmlStateMachinePrivate::get(sm_);
@@ -248,7 +261,7 @@ void StateMachine::postAction(Action action)
 {
   std::lock_guard<std::mutex> lock(action_queue_mutex_);
   action_queue_.push_back(std::move(action));
-  ROS_DEBUG("Posted action %s",action.id.c_str());
+  LOG4CXX_DEBUG(logger_,"Posted action " << action.id);
 }
 
 bool StateMachine::isBusy() const
@@ -283,7 +296,7 @@ void StateMachine::processQueuedActions()
 
   if(is_busy_)
   {
-    ROS_DEBUG_STREAM_NAMED("SM",__func__<< " is busy");
+    LOG4CXX_DEBUG(logger_, __func__ << " is busy");
     return;
   }
 
@@ -341,7 +354,7 @@ void StateMachine::saveStateHistory()
             continue;
           }
 
-          ROS_INFO_STREAM("Saved History state "<<sm_info_->stateName(s_id).toStdString());
+          LOG4CXX_INFO(logger_,"Saved History state "<<sm_info_->stateName(s_id).toStdString());
           history_states.push_back(s_id);
         }
 
@@ -405,7 +418,7 @@ Response StateMachine::executeAction(const Action& action)
   {
     res.msg = boost::str(boost::format("Action '%s' is not valid for any of the active states") % action.id);
     res.success = false;
-    ROS_ERROR_STREAM(res.msg);
+    LOG4CXX_ERROR(logger_,res.msg);
     return std::move(res);
   }
 
@@ -458,7 +471,7 @@ Response StateMachine::executeAction(const Action& action)
     return res;
   }))
   {
-    ROS_ERROR_STREAM(res.msg);
+    LOG4CXX_ERROR(logger_,res.msg);
     return std::move(res);  // precondition failed, not proceeding with transition
   }
 
@@ -509,8 +522,8 @@ Response StateMachine::executeAction(const Action& action)
 
     res.msg = "SM timed out before finishing transition to states [" + target_states_str + "]";
     res.success = false;
-    ROS_ERROR_STREAM(res.msg);
-    ROS_ERROR("Current states are: %s",current_states_str.c_str());
+    LOG4CXX_ERROR(logger_,res.msg);
+    LOG4CXX_ERROR(logger_,"Current states are: " << current_states_str.c_str());
     return std::move(res);
   }
 
@@ -544,13 +557,13 @@ bool StateMachine::addPreconditionCallback(const std::string& st_name, Precondit
 {
   if(!hasState(st_name))
   {
-    ROS_ERROR("State %s was not found in SM",st_name.c_str());
+    LOG4CXX_ERROR(logger_,boost::str(boost::format("State %s was not found in SM") % st_name));
     return false;
   }
 
   if(precond_callbacks_.count(st_name) > 0)
   {
-    ROS_WARN("Pre-condition callback for state %s will be replaced", st_name.c_str());
+    LOG4CXX_WARN(logger_,"Pre-condition callback for state %s will be replaced" <<  st_name);
   }
   precond_callbacks_.insert(std::make_pair(st_name,cb));
 
@@ -561,13 +574,13 @@ bool StateMachine::addEntryCallback(const std::string& st_name, EntryCallback cb
 {
   if(!hasState(st_name))
   {
-    ROS_ERROR("State %s was not found in SM",st_name.c_str());
+    LOG4CXX_ERROR(logger_,boost::str(boost::format("State %s was not found in SM") % st_name));
     return false;
   }
 
   if(entry_callbacks_.count(st_name) > 0)
   {
-    ROS_WARN("Entry callback for state %s will be replaced", st_name.c_str());
+    LOG4CXX_WARN(logger_,boost::str(boost::format("Entry callback for state %s will be replaced") % st_name));
   }
   entry_callbacks_.insert(std::make_pair(st_name,std::make_shared<EntryCbHandler>(async_thread_pool_,cb,async_execution)));
 
@@ -578,12 +591,12 @@ bool StateMachine::addExitCallback(const std::string& st_name, std::function<voi
 {
   if(!hasState(st_name))
   {
-    ROS_ERROR("State %s was not found in SM",st_name.c_str());
+    LOG4CXX_ERROR(logger_,boost::str(boost::format("State %s was not found in SM") % st_name));
     return false;
   }
   if(exit_callbacks_.count(st_name) > 0)
   {
-    ROS_WARN("Exit callback for state %s will be replaced", st_name.c_str());
+    LOG4CXX_WARN(logger_,boost::str(boost::format("Exit callback for state %s will be replaced") % st_name));
   }
   exit_callbacks_.insert(std::make_pair(st_name,cb));
   return true;
@@ -693,7 +706,7 @@ bool StateMachine::isRunning() const
 {
   if(!sm_)
   {
-    ROS_ERROR("QScxmlStateMachine has not been properly initialized");
+    LOG4CXX_ERROR(logger_,"QScxmlStateMachine has not been properly initialized");
     return false;
   }
   return sm_->isRunning();
@@ -709,7 +722,7 @@ bool StateMachine::emitStateEnteredSignal()
     QScxmlStateMachineInfo::StateId id = entered_states_queue_.front();
     entered_states_queue_.pop_front();
     const std::string state_name = getStateFullName(sm_info_,id);
-    ROS_DEBUG("Emitting state_entered signal for state %s",state_name.c_str());
+    LOG4CXX_DEBUG(logger_,boost::str(boost::format("Emitting state_entered signal for state %s") % state_name));
     QTimer::singleShot(10,[&,state_name](){
       emit this->state_entered(state_name);
     });

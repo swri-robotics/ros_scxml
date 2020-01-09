@@ -21,6 +21,7 @@
 #include <QtConcurrent/QtConcurrent>
 #include <boost/none.hpp>
 #include <boost/any.hpp>
+#include <log4cxx/logger.h>
 
 namespace ros_scxml
 {
@@ -140,8 +141,8 @@ private:
   Q_OBJECT
 public:
 
-  StateMachine(double event_loop_period = 0.1);
-  StateMachine(QScxmlStateMachine* sm, double event_loop_period = 0.1);
+  StateMachine(double event_loop_period = 0.1, log4cxx::LoggerPtr logger = nullptr);
+  StateMachine(QScxmlStateMachine* sm, double event_loop_period = 0.1, log4cxx::LoggerPtr logger = nullptr);
   virtual ~StateMachine();
 
   bool loadFile(const std::string& filename);
@@ -253,6 +254,7 @@ protected:
   QThreadPool* async_thread_pool_;
   mutable std::mutex entered_states_mutex_;
   std::deque<QScxmlStateMachineInfo::StateId> entered_states_queue_;
+  log4cxx::LoggerPtr logger_;
 
 };
 

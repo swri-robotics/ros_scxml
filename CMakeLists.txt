@@ -1,17 +1,17 @@
-cmake_minimum_required(VERSION 3.1.0)
+cmake_minimum_required(VERSION 3.5)
 project(ros_scxml)
 
-## Compile as C++14, supported in ROS Kinetic and newer
-set(CMAKE_CXX_STANDARD 14)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
+# Default to C++14
+if(NOT CMAKE_CXX_STANDARD)
+  set(CMAKE_CXX_STANDARD 14)
+  set(CMAKE_CXX_STANDARD_REQUIRED ON)
+  set(CMAKE_CXX_EXTENSIONS OFF)
+endif()
 
 
-find_package(catkin REQUIRED COMPONENTS
-  roscpp
-  std_msgs
-  std_srvs
-)
+if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  add_compile_options(-Wall -Wextra -Wpedantic)
+endif()
 
 #### QT setup
 find_package(Qt5 REQUIRED COMPONENTS
@@ -20,21 +20,35 @@ find_package(Qt5 REQUIRED COMPONENTS
   Scxml
 )
 
-catkin_package(
-  INCLUDE_DIRS
-    include   
-    ${Qt5Core_INCLUDE_DIRS}
-    ${Qt5Widgets_INCLUDE_DIRS}
-    ${Qt5Scxml_INCLUDE_DIRS}
-    ${Qt5Scxml_PRIVATE_INCLUDE_DIRS}
-  LIBRARIES
-    ${PROJECT_NAME}    
-  CATKIN_DEPENDS
-    roscpp
-  DEPENDS
-    Qt5Core
-    Qt5Widgets
-    Qt5Scxml
+find_package(ament_cmake REQUIRED)
+find_package(std_msgs REQUIRED)
+find_package(std_srvs REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(rclcpp_components REQUIRED)
+
+if( Log4cxx_DIR )
+  find_package( Log4cxx NO_MODULE )
+elseif( NOT Log4cxx_FOUND )
+  message(STATUS "Searching for log4cxx/logger.h")
+  find_path( Log4cxx_INCLUDE_DIR log4cxx/logger.h )
+
+  message(STATUS "Searching for libLog4cxx")
+  find_library( Log4cxx_LIBRARY log4cxx )
+
+  include( FindPackageHandleStandardArgs )
+  FIND_PACKAGE_HANDLE_STANDARD_ARGS( Log4cxx Log4cxx_INCLUDE_DIR Log4cxx_LIBRARY )
+  if( LOG4CXX_FOUND )
+    set( Log4cxx_FOUND TRUE )
+  endif()
+endif()
+
+include_directories(
+  include
+  SYSTEM
+  ${Qt5Core_INCLUDE_DIRS}
+  ${Qt5Widgets_INCLUDE_DIRS}
+  ${Qt5Scxml_INCLUDE_DIRS}
+  ${Qt5Scxml_PRIVATE_INCLUDE_DIRS}
 )
 
 set(ROS_SCXML_HEADERS
@@ -44,51 +58,40 @@ set(ROS_SCXML_HEADERS
 qt5_wrap_cpp(ROS_SCXML_MOCS ${ROS_SCXML_HEADERS}
 )
 
-include_directories(
-  include
-  ${catkin_INCLUDE_DIRS}
-  ${Qt5Core_INCLUDE_DIRS}
-  ${Qt5Widgets_INCLUDE_DIRS}
-  ${Qt5Scxml_INCLUDE_DIRS}
-  ${Qt5Scxml_PRIVATE_INCLUDE_DIRS}
-)
-
 # State machine library
-add_library(${PROJECT_NAME}
+add_library(${PROJECT_NAME} SHARED
   src/state_machine.cpp
-  ${ROS_SCXML_MOCS}
+  ${ROS_SCXML_MOCS} 
 )
-
 target_link_libraries(${PROJECT_NAME}
-  ${catkin_LIBRARIES}
   ${Qt5Core_LIBRARIES}
   ${Qt5Widgets_LIBRARIES}
-  ${Qt5Scxml_LIBRARIES}
+  ${Qt5Scxml_LIBRARIES}  
+  ${Log4cxx_LIBRARY}
 )
 
 # Demo Executable
 add_executable(demo_scxml_state_machine
   src/demo_scxml_sm.cpp
 )
-
 target_link_libraries(demo_scxml_state_machine
-  ${catkin_LIBRARIES}
   ${PROJECT_NAME}
 )
+ament_target_dependencies(demo_scxml_state_machine std_msgs std_srvs rclcpp rclcpp_components)
 
 install(TARGETS
     ${PROJECT_NAME}
-  ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-  LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-  RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+    demo_scxml_state_machine
+    RUNTIME DESTINATION bin
+    LIBRARY DESTINATION lib
+    ARCHIVE DESTINATION lib
 )
 
-install(DIRECTORY include/${PROJECT_NAME}/
-  DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
-  PATTERN ".svn" EXCLUDE
+install(DIRECTORY include/
+  DESTINATION include
 )
 
-install(DIRECTORY resource/
-  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/resource
+install(DIRECTORY resource
+  DESTINATION share/${PROJECT_NAME}/
   PATTERN ".svn" EXCLUDE
 )
