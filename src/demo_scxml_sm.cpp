@@ -1,11 +1,12 @@
 
 #include <iostream>
-#include <ros/ros.h>
-#include <std_srvs/Trigger.h>
-#include <std_msgs/String.h>
+#include <rclcpp/rclcpp.hpp>
+#include <std_srvs/srv/trigger.hpp>
+#include <std_msgs/msg/string.hpp>
 #include <QApplication>
 #include "ros_scxml/state_machine.h"
 #include <boost/format.hpp>
+#include <chrono>
 
 static const std::string CURRENT_STATE_TOPIC = "current_state";
 static const std::string EXECUTE_ACTION_TOPIC = "execute_action";
@@ -14,79 +15,76 @@ static const std::string PROCESS_EXECUTION_MSG = "process_msg";
 
 using namespace ros_scxml;
 
-class ROSInterface: protected QObject
+class ROSInterface: public QObject
 {
 public:
-  ROSInterface(ros::NodeHandle nh,StateMachine* sm):
+  ROSInterface(StateMachine* sm, std::shared_ptr<rclcpp::Node> node):
     sm_(sm),
+	node_(node),
     current_state_("none")
   {
-    state_pub_ = nh.advertise<std_msgs::String>(CURRENT_STATE_TOPIC,1);
+	rclcpp::QoS qos(rclcpp::KeepLast(7));
+    state_pub_ = node_->create_publisher<std_msgs::msg::String>("CURRENT_STATE_TOPIC", qos);
 
     // this connection allows receiving the active state through a qt signals emitted by the sm
     connect(sm,&StateMachine::state_entered,[this](std::string state_name){
       current_state_ = state_name;
     });
 
-    // publishes the active state name
-    pub_timer_ = nh.createTimer(ros::Duration(0.2),[this](const ros::TimerEvent&e ){
-      std_msgs::String msg;
-      msg.data = current_state_;
-      state_pub_.publish(msg);
-    });
-
     // prompts the sm to execute an action.
-    execute_state_subs_ = nh.subscribe<std_msgs::String>(EXECUTE_ACTION_TOPIC,1,
-                                                         [this](const std_msgs::StringConstPtr& msg){
+    execute_state_subs_ = node_->create_subscription<std_msgs::msg::String>(EXECUTE_ACTION_TOPIC,1,
+                                                         [this](const std_msgs::msg::String::SharedPtr msg){
       if(sm_->isBusy())
       {
-        ROS_ERROR("State Machine is busy");
+        RCLCPP_ERROR(node_->get_logger(), "State Machine is busy");
         return;
       }
 
-      Response res = sm_->execute(Action{.id = msg->data,.data = ros::Time::now().toSec()});
+      rclcpp::Clock ros_clock;
+      Response res = sm_->execute(Action{.id = msg->data,.data = ros_clock.now()});
       if(!res)
       {
         return;
       }
 
-      ROS_INFO("Action %s successfully executed",msg->data.c_str());
+      RCLCPP_INFO(node_->get_logger(), "Action %s successfully executed",msg->data);
 
       // checking for returned data
       if(!res.data.empty())
       {
         try
         {
-          ROS_INFO_STREAM("Time value returned from state: "<< boost::any_cast<double>(res.data)<<" seconds");
+          RCLCPP_INFO(node_->get_logger(), std::string("Time value returned from state: ") +
+        		  std::to_string(boost::any_cast<double>(res.data)) + std::string(" seconds"));
         }
         catch(boost::bad_any_cast &e)
         {
-          ROS_WARN_STREAM(e.what()<<": "<<res.data.type().name());
+          RCLCPP_WARN(node_->get_logger(), e.what() + std::string(": ") + res.data.type().name());
         }
       }
     });
 
     // prints the available actions at the current state
-    print_actions_server_ = nh.advertiseService<std_srvs::Trigger::Request,std_srvs::Trigger::Response>(
-        PRINT_ACTIONS_SERVICE,[this](std_srvs::Trigger::Request& req,
-        std_srvs::Trigger::Response& res){
+    print_actions_server_ = node_->create_service<std_srvs::srv::Trigger>(
+        PRINT_ACTIONS_SERVICE,[this](const std::shared_ptr<std_srvs::srv::Trigger::Request> req,
+				std::shared_ptr<std_srvs::srv::Trigger::Response > res) -> void{
 
       if(!sm_->isRunning())
       {
-        res.message = "SM is not running";
-        res.success = false;
-        ROS_ERROR_STREAM(res.message);
-        return true;
+        res->message = "SM is not running";
+        res->success = false;
+        RCLCPP_ERROR(node_->get_logger(), res->message);
+        return;
       }
 
       std::vector<std::string> actions = sm_->getAvailableActions();
       if(actions.empty())
       {
-        res.message = "No actions available within the current state";
-        res.success = false;
+        res->message = "No actions available within the current state";
+        res->success = false;
 
-        ROS_ERROR_STREAM(res.message);
-        return true;
+        RCLCPP_ERROR(node_->get_logger(), res->message);
+        return;
       }
 
       std::cout<<"\nSM Actions: "<<std::endl;
@@ -94,32 +92,40 @@ public:
       {
         std::cout<<"\t-"<<s<<std::endl;
       }
-      res.success = true;
-      return true;
+      res->success = true;
+      return;
     });
 
-    pub_timer_.start();
+    // publishes the active state name
+    pub_timer_ = node_->create_wall_timer(std::chrono::duration<double>(0.2),[this](){
+      std_msgs::msg::String msg;
+      msg.data = current_state_;
+      state_pub_->publish(msg);
+    });
+
   }
 
 
 protected:
 
   std::string current_state_;
-  ros::Timer pub_timer_;
-  ros::Publisher state_pub_;
-  ros::Subscriber execute_state_subs_;
-  ros::ServiceServer print_actions_server_;
+  std::shared_ptr<rclcpp::Node> node_;
+  rclcpp::TimerBase::SharedPtr pub_timer_;
+  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr  state_pub_;
+  rclcpp::Subscription<std_msgs::msg::String>::SharedPtr execute_state_subs_;
+  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr print_actions_server_;
   StateMachine* sm_;
 };
 
 class MockApplication
 {
 public:
-  MockApplication(ros::NodeHandle nh)
+  MockApplication(std::shared_ptr<rclcpp::Node> node):
+	  node_(node)
   {
     continue_process_ = false;
     ready_ = false;
-    process_msg_pub_ = nh.advertise<std_msgs::String>(PROCESS_EXECUTION_MSG,1);
+    process_msg_pub_ = node_->create_publisher<std_msgs::msg::String>(PROCESS_EXECUTION_MSG,1);
   }
 
   ~MockApplication()
@@ -132,7 +138,7 @@ public:
     ready_ = true;
     continue_process_ = true;
     counter_ = 0;
-    ROS_INFO_NAMED("Process","Reseted process variables");
+    RCLCPP_INFO(node_->get_logger(),"Reseted process variables");
   }
 
   int getCounter() const
@@ -151,14 +157,15 @@ public:
       return false;
     }
 
-    ros::Duration process_pause(2.0);
+    //rclcpp::Duration process_pause(2.0);
+    std::chrono::duration<double> process_pause(2.0); // seconds
     continue_process_ = true;
-    while(continue_process_ && ros::ok())
+    while(continue_process_ && rclcpp::ok())
     {
-      std_msgs::String msg;
+      std_msgs::msg::String msg;
       msg.data = boost::str(boost::format("Incremented counter to %i") % counter_);
-      process_msg_pub_.publish(msg);
-      process_pause.sleep();
+      process_msg_pub_->publish(msg);
+      rclcpp::sleep_for(std::chrono::duration_cast<std::chrono::nanoseconds>(process_pause));
       counter_++;
     }
     return true;
@@ -173,13 +180,15 @@ public:
   {
     continue_process_ = false;
     ready_ = false;
-    ROS_INFO_NAMED("Process","Process halted");
+    RCLCPP_INFO(node_->get_logger(),"Process halted");
     return;
   }
 
 
 protected:
-  ros::Publisher process_msg_pub_;
+
+  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr process_msg_pub_;
+  std::shared_ptr<rclcpp::Node> node_;
   std::atomic<bool> continue_process_;
   std::atomic<bool> ready_;
   int counter_;
@@ -191,37 +200,39 @@ int main(int argc, char **argv)
 {
   using namespace ros_scxml;
 
-  ros::init(argc, argv, "demo_scxml_state_machine");
-  ros::NodeHandle nh;
-  ros::NodeHandle ph("~");
-  ros::AsyncSpinner spinner(2);
-  spinner.start();
+  rclcpp::init(argc, argv);
+  std::shared_ptr<rclcpp::Node> node = std::make_shared<rclcpp::Node>("demo_scxml_state_machine",
+		  rclcpp::NodeOptions());
 
-  ros::Rate throttle(100);
+  rclcpp::Rate throttle(100);
 
   // qt application
   QApplication app(argc, argv);
 
   // get params
   std::string state_machine_file;
-  if(!ph.getParam("state_machine_file", state_machine_file))
+  const std::vector<rclcpp::ParameterValue> parameters = {node->declare_parameter("state_machine_file")};
+  // checking parameter(s)
+  if(parameters.front().get_type() == rclcpp::ParameterType::PARAMETER_NOT_SET)
   {
-    ROS_ERROR("failed to load state machine file");
+    RCLCPP_ERROR(node->get_logger(),"Failed to read state machine file parameter");
     return -1;
   }
+
+  // getting parameters now
+  state_machine_file = parameters[0].get<std::string>();
 
   // create state machine
   StateMachine* sm = new StateMachine();
   if(!sm->loadFile(state_machine_file))
   {
-    ROS_ERROR("Failed to load state machine file %s",state_machine_file.c_str());
+    RCLCPP_ERROR(node->get_logger(), "Failed to load state machine file %s",state_machine_file.c_str());
     return -1;
   }
-  ROS_INFO("Loaded file");
+  RCLCPP_INFO(node->get_logger(), "Loaded file");
 
   // adding application methods to SM
-  MockApplication process_app(nh);
-  bool success = false;
+  MockApplication process_app(node);
   std::vector< std::function<bool ()> > functions = {
 
     // custom function invoked when the "st3Reseting" state is entered
@@ -234,16 +245,16 @@ int main(int argc, char **argv)
           try
           {
             double secs = boost::any_cast<double>(action.data);
-            ROS_INFO("State received time value of %f seconds",secs);
+            RCLCPP_INFO(node->get_logger(),"State received time value of %f seconds",secs);
           }
           catch(boost::bad_any_cast &e)
           {
-            ROS_WARN_STREAM(e.what());
+            RCLCPP_WARN(node->get_logger(), e.what());
           }
         }
 
         process_app.resetProcess();
-        ros::Duration(3.0).sleep();
+        rclcpp::sleep_for(std::chrono::milliseconds(3000));
         // queuing action, should exit the state
         sm->postAction(Action{.id="trIdle"});
         return true;
@@ -259,9 +270,9 @@ int main(int argc, char **argv)
 
     // custom function invoked when the "st3Execute" state is exited
     [&]() -> bool{
-      return sm->addExitCallback("st3Execute",[&process_app](){
+      return sm->addExitCallback("st3Execute",[&process_app, &node](){
         process_app.pauseProcess();
-        ROS_INFO_STREAM("Process counter at "<<process_app.getCounter());
+        RCLCPP_INFO(node->get_logger(), "Process counter at %i", process_app.getCounter());
       });
     },
 
@@ -284,9 +295,9 @@ int main(int argc, char **argv)
     // custom function invoked when the "st3Suspending" state is entered
     [&]() -> bool{
       return sm->addEntryCallback("st3Suspending",[&](const Action& action) -> Response{
-        ROS_INFO("Suspending process");
+        RCLCPP_INFO(node->get_logger(), "Suspending process");
         process_app.haltProcess();
-        ros::Duration(3.0).sleep();
+        rclcpp::sleep_for(std::chrono::milliseconds(3000));
 
         // queuing action, should exit the state
         sm->postAction(Action{.id="trSuspending"});
@@ -301,7 +312,7 @@ int main(int argc, char **argv)
       return sm->addEntryCallback("st3Completing",[&process_app](const Action& action) -> Response{
         Response res;
         res.success = true;
-        res.data = ros::Time::now().toSec();
+        res.data = rclcpp::Clock().now();
         return std::move(res);
       },false); // true = runs asynchronously, use for blocking functions
     },
@@ -309,8 +320,8 @@ int main(int argc, char **argv)
     // custom function invoked when the "st2Clearing" state is entered, it will exit after waiting for 3 seconds
     [&]() -> bool{
       return sm->addEntryCallback("st2Clearing",[&](const Action& action) -> Response{
-        ROS_INFO("Clearing to enable process, please wait ...");
-        ros::Duration(3.0).sleep();
+        RCLCPP_INFO(node->get_logger(), "Clearing to enable process, please wait ...");
+        rclcpp::sleep_for(std::chrono::milliseconds(3000));
 
         // queuing action, should exit the state
         sm->postAction(Action{.id="trStopped"});
@@ -320,8 +331,8 @@ int main(int argc, char **argv)
 
     // custom function invoked when the "st2Clearing" state is exited
     [&]() -> bool{
-      return sm->addExitCallback("st2Clearing",[&process_app](){
-        ROS_INFO("Done Clearing, Process is now good to go ...");
+      return sm->addExitCallback("st2Clearing",[&process_app, &node](){
+        RCLCPP_INFO(node->get_logger(), "Done Clearing, Process is now good to go ...");
       });
     },
   };
@@ -331,29 +342,28 @@ int main(int argc, char **argv)
     return f();
   }))
   {
-    ROS_ERROR("Failed to setup application specific functions");
+    RCLCPP_ERROR(node->get_logger(), "Failed to setup application specific functions");
     return -1;
   }
 
   // create ROS interface
-  ROSInterface ros_interface(nh,sm);
+  ROSInterface ros_interface(sm, node);
 
   // start sm
   if(!sm->start())
   {
-    ROS_ERROR("Failed to start SM");
+    RCLCPP_ERROR(node->get_logger(), "Failed to start SM");
     return -1;
   }
 
   // main loop
-  while(ros::ok())
+  while(rclcpp::ok())
   {
     app.processEvents(QEventLoop::AllEvents);
     throttle.sleep();
   }
 
   app.exit();
-  spinner.stop();
 
   return 0;
 
