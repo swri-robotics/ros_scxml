@@ -5,8 +5,8 @@
  *      Author: jrgnicho
  */
 
-#ifndef INCLUDE_ROS_SCXML_STATE_MACHINE_H_
-#define INCLUDE_ROS_SCXML_STATE_MACHINE_H_
+#ifndef INCLUDE_SCXML_CORE_STATE_MACHINE_H_
+#define INCLUDE_SCXML_CORE_STATE_MACHINE_H_
 
 #include <list>
 #include <mutex>
@@ -23,7 +23,7 @@
 #include <boost/any.hpp>
 #include <log4cxx/logger.h>
 
-namespace ros_scxml
+namespace scxml_core
 {
 
 struct Action
@@ -258,6 +258,6 @@ protected:
 
 };
 
-} /* namespace ros_scxml */
+} /* namespace scxml_core */
 
-#endif /* INCLUDE_ROS_SCXML_STATE_MACHINE_H_ */
+#endif /* INCLUDE_SCXML_CORE_STATE_MACHINE_H_ */

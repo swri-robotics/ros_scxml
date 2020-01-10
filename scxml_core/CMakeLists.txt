@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.5)
-project(ros_scxml)
+project(scxml_core)
 
 # Default to C++14
 if(NOT CMAKE_CXX_STANDARD)
@@ -10,7 +10,7 @@ endif()
 
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  add_compile_options(-Wall -Wextra -Wpedantic)
+  #add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
 #### QT setup
@@ -20,11 +20,6 @@ find_package(Qt5 REQUIRED COMPONENTS
   Scxml
 )
 
-find_package(ament_cmake REQUIRED)
-find_package(std_msgs REQUIRED)
-find_package(std_srvs REQUIRED)
-find_package(rclcpp REQUIRED)
-find_package(rclcpp_components REQUIRED)
 
 if( Log4cxx_DIR )
   find_package( Log4cxx NO_MODULE )
@@ -42,46 +37,56 @@ elseif( NOT Log4cxx_FOUND )
   endif()
 endif()
 
-include_directories(
-  include
-  SYSTEM
-  ${Qt5Core_INCLUDE_DIRS}
-  ${Qt5Widgets_INCLUDE_DIRS}
-  ${Qt5Scxml_INCLUDE_DIRS}
-  ${Qt5Scxml_PRIVATE_INCLUDE_DIRS}
+set(SCXML_CORE_HEADERS
+  include/scxml_core/state_machine.h
+)
+qt5_wrap_cpp(SCXML_CORE_MOCS ${SCXML_CORE_HEADERS}
 )
 
-set(ROS_SCXML_HEADERS
-  include/ros_scxml/state_machine.h
-)
+# build
+list(FIND CMAKE_CXX_COMPILE_FEATURES cxx_std_14 CXX_FEATURE_FOUND)
 
-qt5_wrap_cpp(ROS_SCXML_MOCS ${ROS_SCXML_HEADERS}
-)
-
-# State machine library
 add_library(${PROJECT_NAME} SHARED
   src/state_machine.cpp
-  ${ROS_SCXML_MOCS} 
+  ${SCXML_CORE_MOCS} 
 )
-target_link_libraries(${PROJECT_NAME}
+target_link_libraries(${PROJECT_NAME} PUBLIC
   ${Qt5Core_LIBRARIES}
   ${Qt5Widgets_LIBRARIES}
   ${Qt5Scxml_LIBRARIES}  
   ${Log4cxx_LIBRARY}
 )
 
-# Demo Executable
-add_executable(demo_scxml_state_machine
-  src/demo_scxml_sm.cpp
+target_link_libraries(${PROJECT_NAME} PUBLIC
+  ${Boost_LIBRARIES}
+  ${pluginlib_LIBRARIES}
+  ${PCL_LIBRARIES}
+  ${xmlrpcpp_LIBRARIES}
 )
-target_link_libraries(demo_scxml_state_machine
-  ${PROJECT_NAME}
+target_include_directories(${PROJECT_NAME} PUBLIC
+    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+    "$<INSTALL_INTERFACE:include>")
+target_include_directories(${PROJECT_NAME} SYSTEM PUBLIC
+  ${Qt5Core_INCLUDE_DIRS}
+  ${Qt5Widgets_INCLUDE_DIRS}
+  ${Qt5Scxml_INCLUDE_DIRS}
+  ${Qt5Scxml_PRIVATE_INCLUDE_DIRS}
+  ${Log4cxx_INCLUDE_DIRS}
 )
-ament_target_dependencies(demo_scxml_state_machine std_msgs std_srvs rclcpp rclcpp_components)
 
+set_target_properties(${PROJECT_NAME} PROPERTIES
+  CXX_STANDARD 14
+  CXX_STANDARD_REQUIRED YES
+  CXX_EXTENSIONS NO)
+if(CXX_FEATURE_FOUND EQUAL "-1")
+  target_compile_options(${PROJECT_NAME} PRIVATE -std=c++14)
+else()
+  target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_14)
+endif()
+
+#install
 install(TARGETS
     ${PROJECT_NAME}
-    demo_scxml_state_machine
     RUNTIME DESTINATION bin
     LIBRARY DESTINATION lib
     ARCHIVE DESTINATION lib
@@ -91,7 +96,3 @@ install(DIRECTORY include/
   DESTINATION include
 )
 
-install(DIRECTORY resource
-  DESTINATION share/${PROJECT_NAME}/
-  PATTERN ".svn" EXCLUDE
-)

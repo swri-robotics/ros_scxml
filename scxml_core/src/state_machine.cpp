@@ -5,7 +5,7 @@
  *      Author: jrgnicho
  */
 
-#include "ros_scxml/state_machine.h"
+#include "scxml_core/state_machine.h"
 #include <QCoreApplication>
 #include <QTime>
 #include <QEventLoop>
@@ -30,7 +30,7 @@ log4cxx::LoggerPtr createConsoleLogger(const std::string& logger_name)
 
 static log4cxx::LoggerPtr DEFAULT_LOGGER = createConsoleLogger("Default");
 
-namespace ros_scxml
+namespace scxml_core
 {
 
 using SM = QScxmlStateMachine;
@@ -814,5 +814,5 @@ std::vector<int> StateMachine::getValidTransitionIDs() const
   return std::move(valid_transition_ids);
 }
 
-} /* namespace ros_scxml */
+} /* namespace scxml_core */
 
