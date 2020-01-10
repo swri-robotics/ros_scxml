@@ -8,17 +8,9 @@ if(NOT CMAKE_CXX_STANDARD)
   set(CMAKE_CXX_EXTENSIONS OFF)
 endif()
 
-
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  add_compile_options(-Wall -Wextra -Wpedantic)
+  #add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
-
-#### QT setup
-#find_package(Qt5 REQUIRED COMPONENTS
-#  Core
-#  Widgets
-#  Scxml
-#)
 
 find_package(ament_cmake REQUIRED)
 find_package(std_msgs REQUIRED)
@@ -44,39 +36,22 @@ elseif( NOT Log4cxx_FOUND )
   endif()
 endif()
 
-#include_directories(
-#  include
-#  SYSTEM
-#  ${Qt5Core_INCLUDE_DIRS}
-#  ${Qt5Widgets_INCLUDE_DIRS}
-#  ${Qt5Scxml_INCLUDE_DIRS}
-#  ${Qt5Scxml_PRIVATE_INCLUDE_DIRS}
-#)
-#include_directories(
-#  SYSTEM
-#  scxml_core_INCLUDE_DIRS
-#)
-
+# build
 list(FIND CMAKE_CXX_COMPILE_FEATURES cxx_std_14 CXX_FEATURE_FOUND) 
-
-include_directories(
-  SYSTEM
-  ${scxml_core_INCLUDE_DIRS}
-  ${Qt5Widgets_INCLUDE_DIRS}
-)
 
 # Demo Executable
 add_executable(demo_scxml_state_machine
   src/demo_scxml_sm.cpp
 )
 target_link_libraries(demo_scxml_state_machine
-  ${scxml_core_LIBRARIES}
-  ${Qt5Widgets_LIBRARIES}
+  scxml_core::scxml_core
+  Qt5::Widgets
 )
-#target_include_directories(demo_scxml_state_machine PUBLIC
-#    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
-#    "$<INSTALL_INTERFACE:include>")
-#target_include_directories(demo_scxml_state_machine SYSTEM PUBLIC ${Qt5Core_INCLUDE_DIRS})
+
+target_include_directories(demo_scxml_state_machine PUBLIC
+    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+    "$<INSTALL_INTERFACE:include>")
+target_include_directories(demo_scxml_state_machine SYSTEM PUBLIC)
 ament_target_dependencies(demo_scxml_state_machine std_msgs std_srvs rclcpp rclcpp_components)
 
 install(TARGETS

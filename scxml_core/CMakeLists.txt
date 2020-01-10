@@ -10,7 +10,7 @@ endif()
 
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  add_compile_options(-Wall -Wextra -Wpedantic)
+  #add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
 #### QT setup
@@ -50,9 +50,9 @@ add_library(${PROJECT_NAME} SHARED
   ${SCXML_CORE_MOCS} 
 )
 target_link_libraries(${PROJECT_NAME} PUBLIC
-  ${Qt5Core_LIBRARIES}
-  ${Qt5Widgets_LIBRARIES}
-  ${Qt5Scxml_LIBRARIES}  
+  Qt5::Core
+  Qt5::Widgets
+  Qt5::Scxml  
   ${Log4cxx_LIBRARY}
 )
 
@@ -60,9 +60,6 @@ target_include_directories(${PROJECT_NAME} PUBLIC
     "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
     "$<INSTALL_INTERFACE:include>")
 target_include_directories(${PROJECT_NAME} SYSTEM PUBLIC
-  ${Qt5Core_INCLUDE_DIRS}
-  ${Qt5Widgets_INCLUDE_DIRS}
-  ${Qt5Scxml_INCLUDE_DIRS}
   ${Qt5Scxml_PRIVATE_INCLUDE_DIRS}
   ${Log4cxx_INCLUDE_DIRS}
 ) 
@@ -109,6 +106,5 @@ install(FILES
     "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}-config-version.cmake"
     DESTINATION lib/cmake/${PROJECT_NAME})
 
-export(EXPORT ${PROJECT_NAME}-targets FILE
+export(EXPORT ${PROJECT_NAME}-targets NAMESPACE ${PROJECT_NAME}:: FILE
     ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}-targets.cmake)
-
