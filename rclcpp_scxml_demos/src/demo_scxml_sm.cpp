@@ -4,7 +4,7 @@
 #include <std_srvs/srv/trigger.hpp>
 #include <std_msgs/msg/string.hpp>
 #include <QApplication>
-#include "ros_scxml/state_machine.h"
+#include "scxml_core/state_machine.h"
 #include <boost/format.hpp>
 #include <chrono>
 
@@ -13,7 +13,7 @@ static const std::string EXECUTE_ACTION_TOPIC = "execute_action";
 static const std::string PRINT_ACTIONS_SERVICE = "print_actions";
 static const std::string PROCESS_EXECUTION_MSG = "process_msg";
 
-using namespace ros_scxml;
+using namespace scxml_core;
 
 class ROSInterface: public QObject
 {
@@ -198,7 +198,7 @@ protected:
 
 int main(int argc, char **argv)
 {
-  using namespace ros_scxml;
+  using namespace scxml_core;
 
   rclcpp::init(argc, argv);
   std::shared_ptr<rclcpp::Node> node = std::make_shared<rclcpp::Node>("demo_scxml_state_machine",

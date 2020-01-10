@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.5)
-project(scxml_core)
+project(scxml_core VERSION 0.0.0 LANGUAGES CXX)
 
 # Default to C++14
 if(NOT CMAKE_CXX_STANDARD)
@@ -10,7 +10,7 @@ endif()
 
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  #add_compile_options(-Wall -Wextra -Wpedantic)
+  add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
 #### QT setup
@@ -19,7 +19,6 @@ find_package(Qt5 REQUIRED COMPONENTS
   Widgets
   Scxml
 )
-
 
 if( Log4cxx_DIR )
   find_package( Log4cxx NO_MODULE )
@@ -57,12 +56,6 @@ target_link_libraries(${PROJECT_NAME} PUBLIC
   ${Log4cxx_LIBRARY}
 )
 
-target_link_libraries(${PROJECT_NAME} PUBLIC
-  ${Boost_LIBRARIES}
-  ${pluginlib_LIBRARIES}
-  ${PCL_LIBRARIES}
-  ${xmlrpcpp_LIBRARIES}
-)
 target_include_directories(${PROJECT_NAME} PUBLIC
     "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
     "$<INSTALL_INTERFACE:include>")
@@ -72,27 +65,50 @@ target_include_directories(${PROJECT_NAME} SYSTEM PUBLIC
   ${Qt5Scxml_INCLUDE_DIRS}
   ${Qt5Scxml_PRIVATE_INCLUDE_DIRS}
   ${Log4cxx_INCLUDE_DIRS}
-)
+) 
 
 set_target_properties(${PROJECT_NAME} PROPERTIES
   CXX_STANDARD 14
   CXX_STANDARD_REQUIRED YES
   CXX_EXTENSIONS NO)
 if(CXX_FEATURE_FOUND EQUAL "-1")
-  target_compile_options(${PROJECT_NAME} PRIVATE -std=c++14)
+  target_compile_options(${PROJECT_NAME} PUBLIC -std=c++14)
 else()
-  target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_14)
+  target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_14)
 endif()
 
 #install
-install(TARGETS
-    ${PROJECT_NAME}
-    RUNTIME DESTINATION bin
-    LIBRARY DESTINATION lib
-    ARCHIVE DESTINATION lib
-)
+list (APPEND PACKAGE_LIBRARIES ${PROJECT_NAME})
+install(TARGETS ${PACKAGE_LIBRARIES}
+  EXPORT ${PROJECT_NAME}-targets
+  DESTINATION lib)
+
+install(EXPORT ${PROJECT_NAME}-targets
+  NAMESPACE ${PROJECT_NAME}:: DESTINATION lib/cmake/${PROJECT_NAME})
 
 install(DIRECTORY include/
   DESTINATION include
 )
+
+install(FILES package.xml DESTINATION share/${PROJECT_NAME})
+
+# Create cmake config files
+include(CMakePackageConfigHelpers)
+configure_package_config_file(
+    ${CMAKE_CURRENT_LIST_DIR}/cmake/${PROJECT_NAME}-config.cmake.in
+    ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}-config.cmake
+    INSTALL_DESTINATION lib/cmake/${PROJECT_NAME}
+    NO_CHECK_REQUIRED_COMPONENTS_MACRO)
+
+write_basic_package_version_file(
+    ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}-config-version.cmake
+    VERSION ${PROJECT_VERSION} COMPATIBILITY ExactVersion)
+
+install(FILES
+    "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}-config.cmake"
+    "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}-config-version.cmake"
+    DESTINATION lib/cmake/${PROJECT_NAME})
+
+export(EXPORT ${PROJECT_NAME}-targets FILE
+    ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}-targets.cmake)
 
