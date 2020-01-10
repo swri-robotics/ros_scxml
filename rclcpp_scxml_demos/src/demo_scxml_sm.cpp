@@ -24,7 +24,7 @@ public:
     current_state_("none")
   {
 	rclcpp::QoS qos(rclcpp::KeepLast(7));
-    state_pub_ = node_->create_publisher<std_msgs::msg::String>("CURRENT_STATE_TOPIC", qos);
+    state_pub_ = node_->create_publisher<std_msgs::msg::String>(CURRENT_STATE_TOPIC, qos);
 
     // this connection allows receiving the active state through a qt signals emitted by the sm
     connect(sm,&StateMachine::state_entered,[this](std::string state_name){
@@ -47,7 +47,7 @@ public:
         return;
       }
 
-      RCLCPP_INFO(node_->get_logger(), "Action %s successfully executed",msg->data);
+      RCLCPP_INFO(node_->get_logger(), "Action %s successfully executed",msg->data.c_str());
 
       // checking for returned data
       if(!res.data.empty())
@@ -355,12 +355,14 @@ int main(int argc, char **argv)
     RCLCPP_ERROR(node->get_logger(), "Failed to start SM");
     return -1;
   }
+  RCLCPP_INFO(node->get_logger(), "State Machine Ready");
 
   // main loop
   while(rclcpp::ok())
   {
     app.processEvents(QEventLoop::AllEvents);
     throttle.sleep();
+    rclcpp::spin_some(node);
   }
 
   app.exit();

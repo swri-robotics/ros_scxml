@@ -53,19 +53,13 @@ target_include_directories(demo_scxml_state_machine PUBLIC
     "$<INSTALL_INTERFACE:include>")
 target_include_directories(demo_scxml_state_machine SYSTEM PUBLIC)
 ament_target_dependencies(demo_scxml_state_machine std_msgs std_srvs rclcpp rclcpp_components)
-
-install(TARGETS
-    demo_scxml_state_machine
-    RUNTIME DESTINATION bin
-    LIBRARY DESTINATION lib
-    ARCHIVE DESTINATION lib
-)
-
-install(DIRECTORY include/
-  DESTINATION include
-)
+install(TARGETS demo_scxml_state_machine
+DESTINATION lib/${PROJECT_NAME})
 
 install(DIRECTORY resource
   DESTINATION share/${PROJECT_NAME}/
   PATTERN ".svn" EXCLUDE
 )
+
+ament_export_dependencies(ament_cmake)
+ament_package()

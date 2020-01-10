@@ -64,7 +64,7 @@ The `demo_scxml_state_machine` ROS node shows how to use the State Machine libra
   };
 ```
 
-### Run the program
+### ROS 1: Run the program
 1. Start the roscore
 2. Go to the resource directory:
     ```
@@ -103,3 +103,32 @@ The `demo_scxml_state_machine` ROS node shows how to use the State Machine libra
     ```
     rostopic echo /process_msg
     ```
+
+
+### ROS 2: Run the program
+
+1. From the *rclcpp_scxml_demos* directory run the demo node as follows
+```
+ros2 run rclcpp_scxml_demos demo_scxml_state_machine __params:=resource/params.yaml
+```
+
+2. From another terminal echo the current state
+```
+ros2 topic echo /current_state 
+```
+  You should get the name of the current state printed in the terminal
+
+3. Print current actions
+```
+ros2 service call /print_actions std_srvs/srv/Trigger
+```
+
+  In the node terminal you should see a list of available actions within the current state
+
+4. Execute action
+```
+ros2 topic pub -1 /execute_action std_msgs/msg/String '{data: trAborted}'
+```
+  If the action is valid you should see the following confirmation message in the node terminal 
+  *"Action trAborted successfully executed*
+"
