@@ -5,7 +5,7 @@
   <version>0.0.0</version>
   <description>Demo using ros2 with scmxl</description>
   <maintainer email="jrgichodevel@gmail.com">Jorge Nicho</maintainer>
-  <license>TODO: License declaration</license>
+  <license>BSD3</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
