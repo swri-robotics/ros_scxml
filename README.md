@@ -17,7 +17,7 @@ Lightweight finite state machine library that uses the [SCXML](https://commons.a
 ---
 ## Demo program
 ### Description
-The `demo_scxml_state_machine` ROS node shows how to use the State Machine library with ROS and process specific code.  A key part of this code is in the section that adds custom functions that get invoked when specific states are entered or exited; inspect this section in order to understand how this is accomplished:
+The `demo_scxml_state_machine` ROS node shows how to use the State Machine library with ROS and process specific code.  A key part of this code is in the section that adds custom functions which get invoked when specific states are entered or exited; inspect this section in order to understand how this is accomplished:
 ```cpp
   // adding application methods to SM
   MockApplication process_app(nh);
@@ -64,7 +64,54 @@ The `demo_scxml_state_machine` ROS node shows how to use the State Machine libra
   };
 ```
 
-### ROS 1: Run the program
+---
+### Workspace Setup
+#### catkin (ROS1)
+1. Blacklist ros2 package, from the repo directory run the following:
+    ```
+    cat catkin-ignore.txt | xargs -n 1 catkin config -a --blacklist
+    ```
+
+2. Build the workspace
+    ```
+    catkin build
+    ```
+
+#### colcon (ROS2)
+These steps use the [mixin feature of colcon](https://github.com/colcon/colcon-mixin-repository) to ignore ros1 (catkin) packages. More on that [here](https://colcon.readthedocs.io/en/released/reference/verb/mixin.html)
+1. Create a *mixin* directory in your workspace directory
+	```
+	mkdir mixin
+	```
+2. Create an **index.yaml** file with the following content
+	```
+	mixin:
+    - skip.mixin
+    ```
+    
+3. Copy the **skip.mixin** file of the repo into the mixin directory
+	```
+	cp src/ros_scxml/skip.mixin mixin
+	```
+	
+4. Add the mixin to the colcon workspace
+	```
+	colcon mixin add skip file://`pwd`/mixin/index.yaml
+	colcon mixin update skip
+	```
+		
+	NOTE: If you need to blacklist other packages then edit the **mixin/skip.mixin** file and add those
+	packages to the `packages-skip` list
+	
+5. Build colcon environment
+	```
+	colcon build --symlink-install --mixin skip
+	```
+
+> These instructions were inspired by this [ros answers post](https://answers.ros.org/question/306624/ignore-package-in-colcon-but-not-catkin/)
+---
+### RUN Demo
+#### ROS 1
 1. Start the roscore
 2. Go to the resource directory:
     ```
@@ -104,31 +151,27 @@ The `demo_scxml_state_machine` ROS node shows how to use the State Machine libra
     rostopic echo /process_msg
     ```
 
-
-### ROS 2: Run the program
+#### ROS 2
 
 1. From the *rclcpp_scxml_demos* directory run the demo node as follows
-```
-ros2 run rclcpp_scxml_demos demo_scxml_state_machine __params:=resource/params.yaml
-```
-
+    ```
+    ros2 run rclcpp_scxml_demos demo_scxml_state_machine __params:=resource/params.yaml
+    ```
 2. From another terminal echo the current state
-```
-ros2 topic echo /current_state 
-```
+    ```
+    ros2 topic echo /current_state 
+    ```
   You should get the name of the current state printed in the terminal
 
 3. Print current actions
-```
-ros2 service call /print_actions std_srvs/srv/Trigger
-```
-
+    ```
+    ros2 service call /print_actions std_srvs/srv/Trigger
+    ```
   In the node terminal you should see a list of available actions within the current state
 
 4. Execute action
-```
-ros2 topic pub -1 /execute_action std_msgs/msg/String '{data: trAborted}'
-```
+    ```
+    ros2 topic pub -1 /execute_action std_msgs/msg/String '{data: trAborted}'
+    ```
   If the action is valid you should see the following confirmation message in the node terminal 
-  *"Action trAborted successfully executed*
-"
+  *"Action trAborted successfully executed"*

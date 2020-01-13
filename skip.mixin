@@ -1,0 +1,8 @@
+{
+  "build": {
+    "skip": {
+      "packages-skip": ["roscpp_scxml_demos"
+                        ],
+    }
+  }
+}
