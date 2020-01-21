@@ -271,6 +271,7 @@ protected:
   std::list<Action> action_queue_;
 
   // action execution members
+  QMetaObject::Connection* init_st_connection_ = nullptr;
   double event_loop_period_;
   QTimer* execute_action_timer_;
   mutable std::mutex execution_action_mutex_;
