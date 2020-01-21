@@ -35,6 +35,7 @@
 
 #include "scxml_core/state_machine.h"
 #include <QCoreApplication>
+#include <QString>
 #include <QTime>
 #include <QEventLoop>
 #include <boost/format.hpp>
@@ -42,6 +43,7 @@
 #include <log4cxx/patternlayout.h>
 #include <log4cxx/consoleappender.h>
 
+static const std::string AUTO_INIT_ACTION = "auto_init";
 static const int WAIT_TRANSITION_PERIOD = 1000; // ms
 static const int WAIT_QT_EVENTS = WAIT_TRANSITION_PERIOD/40.0; // ms
 
@@ -264,7 +266,24 @@ bool StateMachine::start()
 
   execute_action_timer_->start(1000*event_loop_period_);
   is_busy_= false;
+
   sm_->start();
+  QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
+
+  // TODO: Not great way to invoke the initial state callback, this bypasses the SM control loop
+  auto names = sm_->activeStateNames();
+  if(names.count() < 1)
+  {
+    LOG4CXX_ERROR(logger_," No active states were found, at least the initial state was expected");
+    return false;
+  }
+  else
+  {
+    std::string init_st = sm_->activeStateNames().at(0).toStdString();
+    LOG4CXX_INFO(logger_,"Forcing Invocation of cb for state '"<< init_st <<"'");
+    (*entry_callbacks_.at(init_st))(Action{id : AUTO_INIT_ACTION});
+  }
+
   return true;
 }
 
