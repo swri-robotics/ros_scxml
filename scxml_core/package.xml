@@ -7,6 +7,9 @@
   <maintainer email="jrgnichodevel@gmail.com">Jorge Nicho</maintainer>
   <license>BSD3</license>
 
+  <depend>boost</depend>
+  <depend>log4cxx</depend>
+
   <export>
     <build_type> cmake </build_type>
   </export>
