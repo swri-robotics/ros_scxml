@@ -53,21 +53,17 @@
 
 namespace scxml_core
 {
-
 struct Action
 {
-  std::string id;   /**@brief name of the event */
-  boost::any data;  /**@brief optional data needed by the state */
+  std::string id;  /**@brief name of the event */
+  boost::any data; /**@brief optional data needed by the state */
 
   /**
    * @brief allows using the action as a map key by using the id member
    * @param action
    * @return
    */
-  bool operator< (const Action& action) const
-  {
-    return action.id < this->id;
-  }
+  bool operator<(const Action& action) const { return action.id < this->id; }
 };
 
 struct Response
@@ -77,25 +73,14 @@ struct Response
    * @param success   Set to true if the requested action was completed, use false otherwise.
    * @param data          Optional data that was generated from the requested transaction.
    */
-  Response(bool success = true, boost::any data = boost::any(), std::string msg = ""):
-    success(success),
-    data(data),
-    msg(msg)
-  {
-
-  }
-
-  Response(const Response& obj):
-    success(obj.success),
-    data(obj.data),
-    msg(obj.msg)
+  Response(bool success = true, boost::any data = boost::any(), std::string msg = "")
+    : success(success), data(data), msg(msg)
   {
   }
 
-  ~Response()
-  {
+  Response(const Response& obj) : success(obj.success), data(obj.data), msg(obj.msg) {}
 
-  }
+  ~Response() {}
 
   Response& operator=(const Response& obj)
   {
@@ -111,44 +96,34 @@ struct Response
     return *this;
   }
 
-  operator bool() const
-  {
-    return success;
-  }
+  operator bool() const { return success; }
 
   bool success;
   boost::any data;
   std::string msg;
 };
 
-class StateMachine: public QObject
+class StateMachine : public QObject
 {
 public:
-
-  typedef std::function< Response (const Action& ) > PreconditionCallback;
-  typedef std::function< Response (const Action& ) > EntryCallback;
+  typedef std::function<Response(const Action&)> PreconditionCallback;
+  typedef std::function<Response(const Action&)> EntryCallback;
 
 private:
-
   class EntryCbHandler
   {
   public:
-    EntryCbHandler(QThreadPool* thread_pool,EntryCallback cb,bool async_execution = false):
-      cb_(cb),
-      async_execution_(async_execution),
-      tpool_(thread_pool)
+    EntryCbHandler(QThreadPool* thread_pool, EntryCallback cb, bool async_execution = false)
+      : cb_(cb), async_execution_(async_execution), tpool_(thread_pool)
     {
-
     }
 
     Response operator()(const Action& arg)
     {
       Response res;
-      if(async_execution_)
+      if (async_execution_)
       {
-        QFuture<Response> future = QtConcurrent::run(tpool_,[this,arg](){
-          return cb_(arg);
-        });
+        QFuture<Response> future = QtConcurrent::run(tpool_, [this, arg]() { return cb_(arg); });
         res = true;
       }
       else
@@ -162,13 +137,11 @@ private:
     bool async_execution_;
     EntryCallback cb_;
     QThreadPool* tpool_;
-
   };
   typedef std::shared_ptr<EntryCbHandler> EntryCbHandlerPtr;
 
   Q_OBJECT
 public:
-
   StateMachine(double event_loop_period = 0.1, log4cxx::LoggerPtr logger = nullptr);
   StateMachine(QScxmlStateMachine* sm, double event_loop_period = 0.1, log4cxx::LoggerPtr logger = nullptr);
   virtual ~StateMachine();
@@ -200,7 +173,7 @@ public:
    * @param cb      The callback to be invoked; it must be a non-blocking function.
    * @return  True on success, false otherwise
    */
-  bool addPreconditionCallback(const std::string& st_name,PreconditionCallback cb);
+  bool addPreconditionCallback(const std::string& st_name, PreconditionCallback cb);
 
   /**
    * @brief adds an callback that gets invoked when a state is entered
@@ -209,7 +182,7 @@ public:
    * @param async_execution Set to true for blocking callbacks; the callback will be executed asynchronously
    * @return  True on success, false otherwise
    */
-  bool addEntryCallback(const std::string& st_name,EntryCallback cb, bool async_execution = false);
+  bool addEntryCallback(const std::string& st_name, EntryCallback cb, bool async_execution = false);
 
   /**
    * @brief adds an callback that gets invoked when a state is exited
@@ -217,7 +190,7 @@ public:
    * @param cb      The callback to be invoked; it must be a non-blocking function.
    * @return  True on success, false otherwise
    */
-  bool addExitCallback(const std::string& st_name,std::function< void ()> cb);
+  bool addExitCallback(const std::string& st_name, std::function<void()> cb);
 
   /**
    * @brief provides a list of actions available at the current state
@@ -244,18 +217,17 @@ public:
    */
   bool wait(double timeout) const;
 
-  signals:
+signals:
   void state_entered(std::string);
   void state_exited(std::string);
 
 protected:
-
   void signalSetup();
   bool emitStateEnteredSignal();
   Response executeAction(const Action& action);
   void processQueuedActions();
   std::vector<int> getTransitionsIDs(const QVector<int>& states) const;
-  std::vector<int>  getValidTransitionIDs() const;
+  std::vector<int> getValidTransitionIDs() const;
   void saveStateHistory();
   void clearStateHistory();
 
@@ -263,7 +235,7 @@ protected:
   QScxmlStateMachineInfo* sm_info_;
   QScxmlStateMachine* sm_;
   QScxmlStateMachinePrivate* sm_private_;
-  std::map<std::string,int> st_ids_map_;
+  std::map<std::string, int> st_ids_map_;
   std::map<int, std::vector<int> > history_buffer_;
 
   // action queue members
@@ -279,12 +251,11 @@ protected:
   std::atomic<bool> all_states_entered_;
   std::map<std::string, PreconditionCallback> precond_callbacks_;
   std::map<std::string, EntryCbHandlerPtr> entry_callbacks_;
-  std::map<std::string, std::function< void() > > exit_callbacks_;
+  std::map<std::string, std::function<void()> > exit_callbacks_;
   QThreadPool* async_thread_pool_;
   mutable std::mutex entered_states_mutex_;
   std::deque<QScxmlStateMachineInfo::StateId> entered_states_queue_;
   log4cxx::LoggerPtr logger_;
-
 };
 
 } /* namespace scxml_core */
