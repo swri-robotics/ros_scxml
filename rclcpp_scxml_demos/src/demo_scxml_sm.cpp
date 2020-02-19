@@ -49,103 +49,96 @@ static const std::string PROCESS_EXECUTION_MSG = "process_msg";
 
 using namespace scxml_core;
 
-class ROSInterface: public QObject
+class ROSInterface : public QObject
 {
 public:
-  ROSInterface(StateMachine* sm, std::shared_ptr<rclcpp::Node> node):
-    sm_(sm),
-	node_(node),
-    current_state_("none")
+  ROSInterface(StateMachine* sm, std::shared_ptr<rclcpp::Node> node) : sm_(sm), node_(node), current_state_("none")
   {
-	rclcpp::QoS qos(rclcpp::KeepLast(7));
+    rclcpp::QoS qos(rclcpp::KeepLast(7));
     state_pub_ = node_->create_publisher<std_msgs::msg::String>(CURRENT_STATE_TOPIC, qos);
 
     // this connection allows receiving the active state through a qt signals emitted by the sm
-    connect(sm,&StateMachine::state_entered,[this](std::string state_name){
-      current_state_ = state_name;
-    });
+    connect(sm, &StateMachine::state_entered, [this](std::string state_name) { current_state_ = state_name; });
 
     // prompts the sm to execute an action.
-    execute_state_subs_ = node_->create_subscription<std_msgs::msg::String>(EXECUTE_ACTION_TOPIC,1,
-                                                         [this](const std_msgs::msg::String::SharedPtr msg){
-      if(sm_->isBusy())
-      {
-        RCLCPP_ERROR(node_->get_logger(), "State Machine is busy");
-        return;
-      }
+    execute_state_subs_ = node_->create_subscription<std_msgs::msg::String>(
+        EXECUTE_ACTION_TOPIC, 1, [this](const std_msgs::msg::String::SharedPtr msg) {
+          if (sm_->isBusy())
+          {
+            RCLCPP_ERROR(node_->get_logger(), "State Machine is busy");
+            return;
+          }
 
-      rclcpp::Clock ros_clock;
-      Response res = sm_->execute(Action{.id = msg->data,.data = ros_clock.now()});
-      if(!res)
-      {
-        return;
-      }
+          rclcpp::Clock ros_clock;
+          Response res = sm_->execute(Action{ .id = msg->data, .data = ros_clock.now() });
+          if (!res)
+          {
+            return;
+          }
 
-      RCLCPP_INFO(node_->get_logger(), "Action %s successfully executed",msg->data.c_str());
+          RCLCPP_INFO(node_->get_logger(), "Action %s successfully executed", msg->data.c_str());
 
-      // checking for returned data
-      if(!res.data.empty())
-      {
-        try
-        {
-          RCLCPP_INFO(node_->get_logger(), std::string("Time value returned from state: ") +
-        		  std::to_string(boost::any_cast<double>(res.data)) + std::string(" seconds"));
-        }
-        catch(boost::bad_any_cast &e)
-        {
-          RCLCPP_WARN(node_->get_logger(), e.what() + std::string(": ") + res.data.type().name());
-        }
-      }
-    });
+          // checking for returned data
+          if (!res.data.empty())
+          {
+            try
+            {
+              RCLCPP_INFO(node_->get_logger(),
+                          std::string("Time value returned from state: ") +
+                              std::to_string(boost::any_cast<double>(res.data)) + std::string(" seconds"));
+            }
+            catch (boost::bad_any_cast& e)
+            {
+              RCLCPP_WARN(node_->get_logger(), e.what() + std::string(": ") + res.data.type().name());
+            }
+          }
+        });
 
     // prints the available actions at the current state
     print_actions_server_ = node_->create_service<std_srvs::srv::Trigger>(
-        PRINT_ACTIONS_SERVICE,[this](const std::shared_ptr<std_srvs::srv::Trigger::Request> req,
-				std::shared_ptr<std_srvs::srv::Trigger::Response > res) -> void{
+        PRINT_ACTIONS_SERVICE,
+        [this](const std::shared_ptr<std_srvs::srv::Trigger::Request> req,
+               std::shared_ptr<std_srvs::srv::Trigger::Response> res) -> void {
+          if (!sm_->isRunning())
+          {
+            res->message = "SM is not running";
+            res->success = false;
+            RCLCPP_ERROR(node_->get_logger(), res->message);
+            return;
+          }
 
-      if(!sm_->isRunning())
-      {
-        res->message = "SM is not running";
-        res->success = false;
-        RCLCPP_ERROR(node_->get_logger(), res->message);
-        return;
-      }
+          std::vector<std::string> actions = sm_->getAvailableActions();
+          if (actions.empty())
+          {
+            res->message = "No actions available within the current state";
+            res->success = false;
 
-      std::vector<std::string> actions = sm_->getAvailableActions();
-      if(actions.empty())
-      {
-        res->message = "No actions available within the current state";
-        res->success = false;
+            RCLCPP_ERROR(node_->get_logger(), res->message);
+            return;
+          }
 
-        RCLCPP_ERROR(node_->get_logger(), res->message);
-        return;
-      }
-
-      std::cout<<"\nSM Actions: "<<std::endl;
-      for(const std::string& s : actions)
-      {
-        std::cout<<"\t-"<<s<<std::endl;
-      }
-      res->success = true;
-      return;
-    });
+          std::cout << "\nSM Actions: " << std::endl;
+          for (const std::string& s : actions)
+          {
+            std::cout << "\t-" << s << std::endl;
+          }
+          res->success = true;
+          return;
+        });
 
     // publishes the active state name
-    pub_timer_ = node_->create_wall_timer(std::chrono::duration<double>(0.2),[this](){
+    pub_timer_ = node_->create_wall_timer(std::chrono::duration<double>(0.2), [this]() {
       std_msgs::msg::String msg;
       msg.data = current_state_;
       state_pub_->publish(msg);
     });
-
   }
 
-
 protected:
-
   std::string current_state_;
   std::shared_ptr<rclcpp::Node> node_;
   rclcpp::TimerBase::SharedPtr pub_timer_;
-  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr  state_pub_;
+  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr state_pub_;
   rclcpp::Subscription<std_msgs::msg::String>::SharedPtr execute_state_subs_;
   rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr print_actions_server_;
   StateMachine* sm_;
@@ -154,31 +147,24 @@ protected:
 class MockApplication
 {
 public:
-  MockApplication(std::shared_ptr<rclcpp::Node> node):
-	  node_(node)
+  MockApplication(std::shared_ptr<rclcpp::Node> node) : node_(node)
   {
     continue_process_ = false;
     ready_ = false;
-    process_msg_pub_ = node_->create_publisher<std_msgs::msg::String>(PROCESS_EXECUTION_MSG,1);
+    process_msg_pub_ = node_->create_publisher<std_msgs::msg::String>(PROCESS_EXECUTION_MSG, 1);
   }
 
-  ~MockApplication()
-  {
-
-  }
+  ~MockApplication() {}
 
   void resetProcess()
   {
     ready_ = true;
     continue_process_ = true;
     counter_ = 0;
-    RCLCPP_INFO(node_->get_logger(),"Reseted process variables");
+    RCLCPP_INFO(node_->get_logger(), "Reseted process variables");
   }
 
-  int getCounter() const
-  {
-    return counter_;
-  }
+  int getCounter() const { return counter_; }
 
   /**
    * @brief this is a blocking function
@@ -186,15 +172,15 @@ public:
    */
   bool executeProcess()
   {
-    if(!ready_)
+    if (!ready_)
     {
       return false;
     }
 
-    //rclcpp::Duration process_pause(2.0);
-    std::chrono::duration<double> process_pause(2.0); // seconds
+    // rclcpp::Duration process_pause(2.0);
+    std::chrono::duration<double> process_pause(2.0);  // seconds
     continue_process_ = true;
-    while(continue_process_ && rclcpp::ok())
+    while (continue_process_ && rclcpp::ok())
     {
       std_msgs::msg::String msg;
       msg.data = boost::str(boost::format("Incremented counter to %i") % counter_);
@@ -205,38 +191,31 @@ public:
     return true;
   }
 
-  void pauseProcess()
-  {
-    continue_process_= false;
-  }
+  void pauseProcess() { continue_process_ = false; }
 
   void haltProcess()
   {
     continue_process_ = false;
     ready_ = false;
-    RCLCPP_INFO(node_->get_logger(),"Process halted");
+    RCLCPP_INFO(node_->get_logger(), "Process halted");
     return;
   }
 
-
 protected:
-
   rclcpp::Publisher<std_msgs::msg::String>::SharedPtr process_msg_pub_;
   std::shared_ptr<rclcpp::Node> node_;
   std::atomic<bool> continue_process_;
   std::atomic<bool> ready_;
   int counter_;
-
 };
 
-
-int main(int argc, char **argv)
+int main(int argc, char** argv)
 {
   using namespace scxml_core;
 
   rclcpp::init(argc, argv);
-  std::shared_ptr<rclcpp::Node> node = std::make_shared<rclcpp::Node>("demo_scxml_state_machine",
-		  rclcpp::NodeOptions());
+  std::shared_ptr<rclcpp::Node> node =
+      std::make_shared<rclcpp::Node>("demo_scxml_state_machine", rclcpp::NodeOptions());
 
   rclcpp::Rate throttle(100);
 
@@ -245,11 +224,11 @@ int main(int argc, char **argv)
 
   // get params
   std::string state_machine_file;
-  const std::vector<rclcpp::ParameterValue> parameters = {node->declare_parameter("state_machine_file")};
+  const std::vector<rclcpp::ParameterValue> parameters = { node->declare_parameter("state_machine_file") };
   // checking parameter(s)
-  if(parameters.front().get_type() == rclcpp::ParameterType::PARAMETER_NOT_SET)
+  if (parameters.front().get_type() == rclcpp::ParameterType::PARAMETER_NOT_SET)
   {
-    RCLCPP_ERROR(node->get_logger(),"Failed to read state machine file parameter");
+    RCLCPP_ERROR(node->get_logger(), "Failed to read state machine file parameter");
     return -1;
   }
 
@@ -258,64 +237,67 @@ int main(int argc, char **argv)
 
   // create state machine
   StateMachine* sm = new StateMachine();
-  if(!sm->loadFile(state_machine_file))
+  if (!sm->loadFile(state_machine_file))
   {
-    RCLCPP_ERROR(node->get_logger(), "Failed to load state machine file %s",state_machine_file.c_str());
+    RCLCPP_ERROR(node->get_logger(), "Failed to load state machine file %s", state_machine_file.c_str());
     return -1;
   }
   RCLCPP_INFO(node->get_logger(), "Loaded file");
 
   // adding application methods to SM
   MockApplication process_app(node);
-  std::vector< std::function<bool ()> > functions = {
+  std::vector<std::function<bool()> > functions = {
 
     // custom function invoked when the "st3Reseting" state is entered
-    [&]() -> bool{
-      return sm->addEntryCallback("st3Reseting",[&](const Action& action) -> Response{
+    [&]() -> bool {
+      return sm->addEntryCallback(
+          "st3Reseting",
+          [&](const Action& action) -> Response {
+            // checking passed user data first
+            if (!action.data.empty())
+            {
+              try
+              {
+                double secs = boost::any_cast<double>(action.data);
+                RCLCPP_INFO(node->get_logger(), "State received time value of %f seconds", secs);
+              }
+              catch (boost::bad_any_cast& e)
+              {
+                RCLCPP_WARN(node->get_logger(), e.what());
+              }
+            }
 
-        // checking passed user data first
-        if(!action.data.empty())
-        {
-          try
-          {
-            double secs = boost::any_cast<double>(action.data);
-            RCLCPP_INFO(node->get_logger(),"State received time value of %f seconds",secs);
-          }
-          catch(boost::bad_any_cast &e)
-          {
-            RCLCPP_WARN(node->get_logger(), e.what());
-          }
-        }
-
-        process_app.resetProcess();
-        rclcpp::sleep_for(std::chrono::milliseconds(3000));
-        // queuing action, should exit the state
-        sm->postAction(Action{.id="trIdle"});
-        return true;
-      },false); // false = runs sequentially, use for non-blocking functions
+            process_app.resetProcess();
+            rclcpp::sleep_for(std::chrono::milliseconds(3000));
+            // queuing action, should exit the state
+            sm->postAction(Action{ .id = "trIdle" });
+            return true;
+          },
+          false);  // false = runs sequentially, use for non-blocking functions
     },
 
     // custom function invoked when the "st3Execute" state is entered
-    [&]() -> bool{
-      return sm->addEntryCallback("st3Execute",[&process_app](const Action& action) -> Response{
-        return process_app.executeProcess();
-      },true); // true = runs asynchronously, use for blocking functions
+    [&]() -> bool {
+      return sm->addEntryCallback(
+          "st3Execute",
+          [&process_app](const Action& action) -> Response { return process_app.executeProcess(); },
+          true);  // true = runs asynchronously, use for blocking functions
     },
 
     // custom function invoked when the "st3Execute" state is exited
-    [&]() -> bool{
-      return sm->addExitCallback("st3Execute",[&process_app, &node](){
+    [&]() -> bool {
+      return sm->addExitCallback("st3Execute", [&process_app, &node]() {
         process_app.pauseProcess();
         RCLCPP_INFO(node->get_logger(), "Process counter at %i", process_app.getCounter());
       });
     },
 
     // custom function invoked prior to entering the "st3Completing" state
-    [&]() -> bool{
-      return sm->addPreconditionCallback("st3Completing",[&process_app](const Action& action) -> Response{
+    [&]() -> bool {
+      return sm->addPreconditionCallback("st3Completing", [&process_app](const Action& action) -> Response {
         Response res;
         static const int REQ_VAL = 16;
-        if(process_app.getCounter() >= REQ_VAL)
+        if (process_app.getCounter() >= REQ_VAL)
         {
           return true;
         }
@@ -327,54 +309,61 @@ int main(int argc, char **argv)
     },
 
     // custom function invoked when the "st3Suspending" state is entered
-    [&]() -> bool{
-      return sm->addEntryCallback("st3Suspending",[&](const Action& action) -> Response{
-        RCLCPP_INFO(node->get_logger(), "Suspending process");
-        process_app.haltProcess();
-        rclcpp::sleep_for(std::chrono::milliseconds(3000));
+    [&]() -> bool {
+      return sm->addEntryCallback(
+          "st3Suspending",
+          [&](const Action& action) -> Response {
+            RCLCPP_INFO(node->get_logger(), "Suspending process");
+            process_app.haltProcess();
+            rclcpp::sleep_for(std::chrono::milliseconds(3000));
 
-        // queuing action, should exit the state
-        sm->postAction(Action{.id="trSuspending"});
-        Response res;
-        res.success = true;
-        return std::move(res);
-      },true); // true = runs asynchronously, use for blocking functions
+            // queuing action, should exit the state
+            sm->postAction(Action{ .id = "trSuspending" });
+            Response res;
+            res.success = true;
+            return std::move(res);
+          },
+          true);  // true = runs asynchronously, use for blocking functions
     },
 
     // custom function invoked when the "st3Completing" state is entered
-    [&]() -> bool{
-      return sm->addEntryCallback("st3Completing",[&process_app](const Action& action) -> Response{
-        Response res;
-        res.success = true;
-        res.data = rclcpp::Clock().now();
-        return std::move(res);
-      },false); // true = runs asynchronously, use for blocking functions
+    [&]() -> bool {
+      return sm->addEntryCallback(
+          "st3Completing",
+          [&process_app](const Action& action) -> Response {
+            Response res;
+            res.success = true;
+            res.data = rclcpp::Clock().now();
+            return std::move(res);
+          },
+          false);  // true = runs asynchronously, use for blocking functions
     },
 
     // custom function invoked when the "st2Clearing" state is entered, it will exit after waiting for 3 seconds
-    [&]() -> bool{
-      return sm->addEntryCallback("st2Clearing",[&](const Action& action) -> Response{
-        RCLCPP_INFO(node->get_logger(), "Clearing to enable process, please wait ...");
-        rclcpp::sleep_for(std::chrono::milliseconds(3000));
+    [&]() -> bool {
+      return sm->addEntryCallback(
+          "st2Clearing",
+          [&](const Action& action) -> Response {
+            RCLCPP_INFO(node->get_logger(), "Clearing to enable process, please wait ...");
+            rclcpp::sleep_for(std::chrono::milliseconds(3000));
 
-        // queuing action, should exit the state
-        sm->postAction(Action{.id="trStopped"});
-        return true;
-      }, true); // true = runs asynchronously, use for blocking functions
+            // queuing action, should exit the state
+            sm->postAction(Action{ .id = "trStopped" });
+            return true;
+          },
+          true);  // true = runs asynchronously, use for blocking functions
     },
 
     // custom function invoked when the "st2Clearing" state is exited
-    [&]() -> bool{
-      return sm->addExitCallback("st2Clearing",[&process_app, &node](){
+    [&]() -> bool {
+      return sm->addExitCallback("st2Clearing", [&process_app, &node]() {
         RCLCPP_INFO(node->get_logger(), "Done Clearing, Process is now good to go ...");
       });
     },
   };
 
   // calling all functions and evaluating returned args
-  if(!std::all_of(functions.begin(),functions.end(),[](auto& f){
-    return f();
-  }))
+  if (!std::all_of(functions.begin(), functions.end(), [](auto& f) { return f(); }))
   {
     RCLCPP_ERROR(node->get_logger(), "Failed to setup application specific functions");
     return -1;
@@ -384,7 +373,7 @@ int main(int argc, char **argv)
   ROSInterface ros_interface(sm, node);
 
   // start sm
-  if(!sm->start())
+  if (!sm->start())
   {
     RCLCPP_ERROR(node->get_logger(), "Failed to start SM");
     return -1;
@@ -392,7 +381,7 @@ int main(int argc, char **argv)
   RCLCPP_INFO(node->get_logger(), "State Machine Ready");
 
   // main loop
-  while(rclcpp::ok())
+  while (rclcpp::ok())
   {
     app.processEvents(QEventLoop::AllEvents);
     throttle.sleep();
@@ -402,5 +391,4 @@ int main(int argc, char **argv)
   app.exit();
 
   return 0;
-
 }

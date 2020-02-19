@@ -1,4 +1,9 @@
 # ros_scxml
+[![Build Status](https://travis-ci.com/swri-robotics/ros_scxml.svg?branch=master)](https://travis-ci.com/swri-robotics/ros_scxml)
+[![Github Issues](https://img.shields.io/github/issues/swri-robotics/ros_scxml.svg)](http://github.com/swri-robotics/ros_scxml/issues)
+
+[![license - bsd 2 clause](https://img.shields.io/:license-BSD%202--Clause-blue.svg)](https://opensource.org/licenses/BSD-2-Clause)
+
 Lightweight finite state machine library that uses the [SCXML](https://commons.apache.org/proper/commons-scxml/guide/scxml-documents.html) standard
 
 ---
