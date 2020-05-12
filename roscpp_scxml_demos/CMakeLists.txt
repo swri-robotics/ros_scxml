@@ -1,6 +1,11 @@
 cmake_minimum_required(VERSION 3.1.0)
 project(roscpp_scxml_demos)
 
+if (NOT $ENV{ROS_VERSION} EQUAL "1")
+  message(WARNING "ROS Version $ENV{ROS_VERSION} found, skipping project ${PROJECT_NAME}")
+  return()
+endif()
+
 ## Compile as C++14, supported in ROS Kinetic and newer
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
