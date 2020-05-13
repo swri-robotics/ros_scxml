@@ -1,6 +1,11 @@
 cmake_minimum_required(VERSION 3.5)
 project(rclcpp_scxml_demos)
 
+if (NOT $ENV{ROS_VERSION} EQUAL "2")
+  message(WARNING "ROS Version $ENV{ROS_VERSION} found, skipping project ${PROJECT_NAME}")
+  return()
+endif()
+
 # Default to C++14
 if(NOT CMAKE_CXX_STANDARD)
   set(CMAKE_CXX_STANDARD 14)

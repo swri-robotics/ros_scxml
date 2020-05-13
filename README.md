@@ -72,48 +72,17 @@ The `demo_scxml_state_machine` ROS node shows how to use the State Machine libra
 ---
 ### Workspace Setup
 #### catkin (ROS1)
-1. Blacklist ros2 package, from the repo directory run the following:
-    ```
-    cat catkin-ignore.txt | xargs -n 1 catkin config -a --blacklist
-    ```
 
-2. Build the workspace
+1. Build the workspace
     ```
     catkin build
     ```
 
-#### colcon (ROS2)
-These steps use the [mixin feature of colcon](https://github.com/colcon/colcon-mixin-repository) to ignore ros1 (catkin) packages. More on that [here](https://colcon.readthedocs.io/en/released/reference/verb/mixin.html)
-1. Create a *mixin* directory in your workspace directory
-	```
-	mkdir mixin
-	```
-2. Create an **index.yaml** file with the following content
-	```
-	mixin:
-    - skip.mixin
-    ```
-    
-3. Copy the **skip.mixin** file of the repo into the mixin directory
-	```
-	cp src/ros_scxml/skip.mixin mixin
-	```
-	
-4. Add the mixin to the colcon workspace
-	```
-	colcon mixin add skip file://`pwd`/mixin/index.yaml
-	colcon mixin update skip
-	```
-		
-	NOTE: If you need to blacklist other packages then edit the **mixin/skip.mixin** file and add those
-	packages to the `packages-skip` list
-	
-5. Build colcon environment
-	```
-	colcon build --symlink-install --mixin skip
-	```
-
-> These instructions were inspired by this [ros answers post](https://answers.ros.org/question/306624/ignore-package-in-colcon-but-not-catkin/)
+#### colcon (ROS2)	
+1. Build colcon environment
+	  ```
+	  colcon build --symlink-install
+	  ```
 ---
 ### RUN Demo
 #### ROS 1
