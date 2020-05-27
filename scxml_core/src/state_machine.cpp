@@ -268,7 +268,10 @@ bool StateMachine::start()
   {
     std::string init_st = sm_->activeStateNames().at(0).toStdString();
     LOG4CXX_INFO(logger_, "Forcing Invocation of cb for state '" << init_st << "'");
-    (*entry_callbacks_.at(init_st))(Action{ id : AUTO_INIT_ACTION });
+    if(entry_callbacks_.count(init_st) > 0 )
+    {
+      (*entry_callbacks_.at(init_st))(Action{ id : AUTO_INIT_ACTION });
+    }
   }
 
   return true;
