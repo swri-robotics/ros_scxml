@@ -281,10 +281,11 @@ bool StateMachine::stop()
   return true;
 }
 
-Response StateMachine::execute(const Action& action) {
-  if(busy_executing_action_ || busy_consuming_entry_cb_)
+Response StateMachine::execute(const Action& action)
+{
+  if (busy_executing_action_ || busy_consuming_entry_cb_)
   {
-    Response res = Response(false,boost::any(),"SM is busy");
+    Response res = Response(false, boost::any(), "SM is busy");
     LOG4CXX_DEBUG(logger_, res.msg);
     return res;
   }
@@ -432,7 +433,7 @@ Response StateMachine::executeAction(const Action& action)
   response_future_ = std::shared_future<Response>(response_promise_.get_future());
 
   // submitting event, entry callbacks registered in signalSetup() should be invoked
-  LOG4CXX_DEBUG(logger_,"Submitting event with id: "<< action.id);
+  LOG4CXX_DEBUG(logger_, "Submitting event with id: " << action.id);
   sm_->submitEvent(QString::fromStdString(action.id));
 
   // wait until transition is complete
@@ -442,14 +443,13 @@ Response StateMachine::executeAction(const Action& action)
   while (QTime::currentTime() < stop_time && !transition_made)
   {
     QCoreApplication::processEvents(QEventLoop::AllEvents, WAIT_QT_EVENTS);
-    transition_made = response_future_.wait_for(
-        std::chrono::milliseconds(WAIT_QT_EVENTS)) == std::future_status::ready;
+    transition_made = response_future_.wait_for(std::chrono::milliseconds(WAIT_QT_EVENTS)) == std::future_status::ready;
   }
 
   // resetting synchronization variables
   action_future_ = std::shared_future<Action>();
   response_promise_ = std::promise<Response>();
-  if(!transition_made)
+  if (!transition_made)
   {
     QVector<QScxmlStateMachineInfo::StateId> current_st_ids = sm_info_->configuration();
     sm_->cancelDelayedEvent(QString::fromStdString(action.id));
@@ -471,11 +471,11 @@ Response StateMachine::executeAction(const Action& action)
     LOG4CXX_ERROR(logger_, "Current states are: " << current_states_str.c_str());
     return std::move(res);
   }
-  LOG4CXX_DEBUG(logger_,"State transitions completed");
+  LOG4CXX_DEBUG(logger_, "State transitions completed");
 
   // retrieve response now
   res = response_future_.get();
-  LOG4CXX_DEBUG(logger_,"Retrieved response structure from future");
+  LOG4CXX_DEBUG(logger_, "Retrieved response structure from future");
   return std::move(res);
 }
 
@@ -666,18 +666,18 @@ void StateMachine::signalSetup()
 
     // getting action set in executionAction()
     Action action;
-    if(action_future_.valid())
+    if (action_future_.valid())
     {
       action = action_future_.get();
-      LOG4CXX_DEBUG(logger_,"Got Action object from future");
+      LOG4CXX_DEBUG(logger_, "Got Action object from future");
     }
     else
     {
-      LOG4CXX_DEBUG(logger_,"No action available in future");
+      LOG4CXX_DEBUG(logger_, "No action available in future");
     }
 
     // calling entry callbacks
-    Response res = true; // response returned through the std::future
+    Response res = true;  // response returned through the std::future
     bool atomic_found = false;
     for (int id : states)
     {
@@ -692,7 +692,7 @@ void StateMachine::signalSetup()
         continue;
       }
 
-      if(!atomic_found)
+      if (!atomic_found)
       {
         res = temp_res;
       }
@@ -701,7 +701,7 @@ void StateMachine::signalSetup()
     }
 
     response_promise_.set_value(res);
-    LOG4CXX_DEBUG(logger_,"All entered states processed");
+    LOG4CXX_DEBUG(logger_, "All entered states processed");
   });
 
   connect(sm_info_, &SMInfo::statesExited, [this](const QVector<QScxmlStateMachineInfo::StateId>& states) {
