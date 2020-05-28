@@ -96,6 +96,7 @@ std::string getStateFullName(const QScxmlStateMachineInfo* sm_info, const QScxml
   return std::move(full_name);
 }
 
+// TODO: Decide whether to use this or delete it.  Not being used at the moment
 TransitionTable buildTransitionTable(const QScxmlStateMachineInfo* sm_info)
 {
   TransitionTable table;
@@ -252,26 +253,18 @@ bool StateMachine::start()
   connect(execute_action_timer_, &QTimer::timeout, [&]() { processQueuedActions(); });
 
   execute_action_timer_->start(1000 * event_loop_period_);
-  is_busy_ = false;
+  busy_executing_action_ = false;
+  busy_consuming_entry_cb_ = false;
 
   sm_->start();
-  QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
+  QCoreApplication::processEvents(QEventLoop::AllEvents, WAIT_QT_EVENTS);
 
-  // TODO: Not great way to invoke the initial state callback, this bypasses the SM control loop
+  // make sure at least one state is active
   auto names = sm_->activeStateNames();
   if (names.count() < 1)
   {
     LOG4CXX_ERROR(logger_, " No active states were found, at least the initial state was expected");
     return false;
-  }
-  else
-  {
-    std::string init_st = sm_->activeStateNames().at(0).toStdString();
-    LOG4CXX_INFO(logger_, "Forcing Invocation of cb for state '" << init_st << "'");
-    if(entry_callbacks_.count(init_st) > 0 )
-    {
-      (*entry_callbacks_.at(init_st))(Action{ id : AUTO_INIT_ACTION });
-    }
   }
 
   return true;
@@ -288,19 +281,28 @@ bool StateMachine::stop()
   return true;
 }
 
-Response StateMachine::execute(const Action& action) { return executeAction(action); }
+Response StateMachine::execute(const Action& action)
+{
+  if (busy_executing_action_ || busy_consuming_entry_cb_)
+  {
+    Response res = Response(false, boost::any(), "SM is busy");
+    LOG4CXX_DEBUG(logger_, res.msg);
+    return res;
+  }
+  return executeAction(action);
+}
 
 void StateMachine::postAction(Action action)
 {
   std::lock_guard<std::mutex> lock(action_queue_mutex_);
-  action_queue_.push_back(std::move(action));
+  action_queue_.push_back(action);
   LOG4CXX_DEBUG(logger_, "Posted action " << action.id);
 }
 
 bool StateMachine::isBusy() const
 {
   std::lock_guard<std::mutex> lock(action_queue_mutex_);
-  return !action_queue_.empty() || is_busy_;
+  return !action_queue_.empty() || busy_executing_action_ || busy_consuming_entry_cb_;
 }
 
 bool StateMachine::wait(double timeout) const
@@ -327,7 +329,7 @@ void StateMachine::processQueuedActions()
 {
   using namespace boost;
 
-  if (is_busy_)
+  if (busy_executing_action_ || busy_consuming_entry_cb_)
   {
     LOG4CXX_DEBUG(logger_, __func__ << " is busy");
     return;
@@ -354,84 +356,9 @@ void StateMachine::processQueuedActions()
   return;
 }
 
-void StateMachine::saveStateHistory()
-{
-  QVector<int> current_st_ids = sm_info_->configuration();
-  const QScxmlExecutableContent::StateTable* state_table = sm_private_->m_stateTable;
-  for (const int& id : current_st_ids)
-  {
-    const QScxmlExecutableContent::StateTable::Array children_st_ids =
-        state_table->array(state_table->state(id).childStates);
-
-    if (!children_st_ids.isValid())
-    {
-      continue;
-    }
-
-    // getting history states
-    for (int k : children_st_ids)
-    {
-      std::vector<int> history_states;
-      if (state_table->state(k).isHistoryState())
-      {
-        for (const int& s_id : current_st_ids)
-        {
-          if (!state_table->state(s_id).isAtomic())
-          {
-            continue;
-          }
-
-          if (sm_info_->stateParent(s_id) != id)
-          {
-            continue;
-          }
-
-          LOG4CXX_INFO(logger_, "Saved History state " << sm_info_->stateName(s_id).toStdString());
-          history_states.push_back(s_id);
-        }
-      }
-
-      if (history_states.empty())
-      {
-        continue;
-      }
-
-      history_buffer_[k] = history_states;
-    }
-  }
-}
-
-void StateMachine::clearStateHistory()
-{
-  QVector<int> current_st_ids = sm_info_->configuration();
-  const QScxmlExecutableContent::StateTable* state_table = sm_private_->m_stateTable;
-  for (const int& id : current_st_ids)
-  {
-    const QScxmlExecutableContent::StateTable::Array children_st_ids =
-        state_table->array(state_table->state(id).childStates);
-
-    if (!children_st_ids.isValid())
-    {
-      continue;
-    }
-
-    // getting history states
-    for (int k : children_st_ids)
-    {
-      if (state_table->state(k).isHistoryState() &&
-          state_table->state(k).type == QScxmlExecutableContent::StateTable::State::DeepHistory &&
-          history_buffer_.count(k) > 0)
-      {
-        history_buffer_.erase(k);
-      }
-    }
-  }
-}
-
 Response StateMachine::executeAction(const Action& action)
 {
-  std::lock_guard<std::mutex> lock(execution_action_mutex_);
-  ScopeExit scope_exit(&this->is_busy_);  // sets the flag to busy
+  ScopeExit scope_exit(&this->busy_executing_action_);  // sets the flag to busy
 
   Response res;
 
@@ -467,19 +394,7 @@ Response StateMachine::executeAction(const Action& action)
     QVector<QScxmlStateMachineInfo::StateId> st_ids = sm_info_->transitionTargets(t_id);
     for (const int& st_id : st_ids)
     {
-      if (sm_private_->m_stateTable->state(st_id).isHistoryState())
-      {
-        // check history buffer
-        if (history_buffer_.count(st_id) > 0)
-        {
-          target_state_ids.insert(
-              target_state_ids.end(), history_buffer_.at(st_id).begin(), history_buffer_.at(st_id).end());
-        }
-      }
-      else
-      {
-        target_state_ids.push_back(st_id);
-      }
+      target_state_ids.push_back(st_id);
     }
   });
 
@@ -510,37 +425,33 @@ Response StateMachine::executeAction(const Action& action)
     return std::move(res);  // precondition failed, not proceeding with transition
   }
 
-  // clear history before transitioning
-  clearStateHistory();
+  // setting up synchronization variables
+  std::promise<Action> action_promise;
+  action_future_ = std::shared_future<Action>(action_promise.get_future());
+  action_promise.set_value(action);
+  response_promise_ = std::promise<Response>();
+  response_future_ = std::shared_future<Response>(response_promise_.get_future());
 
-  // submitting event
+  // submitting event, entry callbacks registered in signalSetup() should be invoked
+  LOG4CXX_DEBUG(logger_, "Submitting event with id: " << action.id);
   sm_->submitEvent(QString::fromStdString(action.id));
 
-  // wait until QT makes the transition to the target state
+  // wait until transition is complete
   QTime stop_time = QTime::currentTime().addMSecs(WAIT_TRANSITION_PERIOD);
   bool transition_made = false;
   QVector<QScxmlStateMachineInfo::StateId> current_st_ids;
-  while (QTime::currentTime() < stop_time)
+  while (QTime::currentTime() < stop_time && !transition_made)
   {
     QCoreApplication::processEvents(QEventLoop::AllEvents, WAIT_QT_EVENTS);
-    current_st_ids = sm_info_->configuration();
-    transition_made = std::any_of(current_st_ids.begin(), current_st_ids.end(), [&](const int& st_id) {
-      return std::find(target_state_ids.begin(), target_state_ids.end(), st_id) != target_state_ids.end();
-    });
-
-    // check that an atomic state is active
-    transition_made &= std::any_of(current_st_ids.begin(), current_st_ids.end(), [&](const int& st_id) {
-      return sm_private_->m_stateTable->state(st_id).isAtomic();
-    });
-
-    if (transition_made)
-    {
-      break;
-    }
+    transition_made = response_future_.wait_for(std::chrono::milliseconds(WAIT_QT_EVENTS)) == std::future_status::ready;
   }
 
+  // resetting synchronization variables
+  action_future_ = std::shared_future<Action>();
+  response_promise_ = std::promise<Response>();
   if (!transition_made)
   {
+    QVector<QScxmlStateMachineInfo::StateId> current_st_ids = sm_info_->configuration();
     sm_->cancelDelayedEvent(QString::fromStdString(action.id));
     std::string current_states_str =
         std::accumulate(std::next(current_st_ids.begin()),
@@ -560,30 +471,11 @@ Response StateMachine::executeAction(const Action& action)
     LOG4CXX_ERROR(logger_, "Current states are: " << current_states_str.c_str());
     return std::move(res);
   }
+  LOG4CXX_DEBUG(logger_, "State transitions completed");
 
-  // save history
-  saveStateHistory();
-
-  // calling entry callbacks
-  for (int id : current_st_ids)
-  {
-    Response st_res;
-    const std::string& st_name = sm_info_->stateName(id).toStdString();
-    if (entry_callbacks_.count(st_name) > 0)
-    {
-      st_res = (*entry_callbacks_.at(st_name))(action);
-    }
-    else
-    {
-      st_res.success = true;
-    }
-
-    if (sm_private_->m_stateTable->state(id).isAtomic())
-    {
-      res = std::move(st_res);
-    }
-  }
-
+  // retrieve response now
+  res = response_future_.get();
+  LOG4CXX_DEBUG(logger_, "Retrieved response structure from future");
   return std::move(res);
 }
 
@@ -763,12 +655,53 @@ bool StateMachine::emitStateEnteredSignal()
 void StateMachine::signalSetup()
 {
   connect(sm_info_, &SMInfo::statesEntered, [this](const QVector<QScxmlStateMachineInfo::StateId>& states) {
+    ScopeExit scope_exit(&this->busy_consuming_entry_cb_);  // sets the flag to busy
+
     std::lock_guard<std::mutex> lock(entered_states_mutex_);
     entered_states_queue_.clear();
     for (const QScxmlStateMachineInfo::StateId& id : states)
     {
       entered_states_queue_.push_back(id);  // will emit entered signals from the processing thread
     }
+
+    // getting action set in executionAction()
+    Action action;
+    if (action_future_.valid())
+    {
+      action = action_future_.get();
+      LOG4CXX_DEBUG(logger_, "Got Action object from future");
+    }
+    else
+    {
+      LOG4CXX_DEBUG(logger_, "No action available in future");
+    }
+
+    // calling entry callbacks
+    Response res = true;  // response returned through the std::future
+    bool atomic_found = false;
+    for (int id : states)
+    {
+      Response temp_res;
+      const std::string& st_name = sm_info_->stateName(id).toStdString();
+      if (entry_callbacks_.count(st_name) > 0)
+      {
+        temp_res = (*entry_callbacks_.at(st_name))(action);
+      }
+      else
+      {
+        continue;
+      }
+
+      if (!atomic_found)
+      {
+        res = temp_res;
+      }
+
+      atomic_found = sm_private_->m_stateTable->state(id).isAtomic();
+    }
+
+    response_promise_.set_value(res);
+    LOG4CXX_DEBUG(logger_, "All entered states processed");
   });
 
   connect(sm_info_, &SMInfo::statesExited, [this](const QVector<QScxmlStateMachineInfo::StateId>& states) {
