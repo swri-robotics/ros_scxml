@@ -228,22 +228,18 @@ protected:
   void processQueuedActions();
   std::vector<int> getTransitionsIDs(const QVector<int>& states) const;
   std::vector<int> getValidTransitionIDs() const;
-  void saveStateHistory();
-  void clearStateHistory();
 
   // state machine members
   QScxmlStateMachineInfo* sm_info_;
   QScxmlStateMachine* sm_;
   QScxmlStateMachinePrivate* sm_private_;
   std::map<std::string, int> st_ids_map_;
-  std::map<int, std::vector<int> > history_buffer_;
 
   // action queue members
   mutable std::mutex action_queue_mutex_;
   std::list<Action> action_queue_;
 
   // action execution members
-  QMetaObject::Connection* init_st_connection_ = nullptr;
   double event_loop_period_;
   QTimer* execute_action_timer_;
   std::atomic<bool> busy_executing_action_;
