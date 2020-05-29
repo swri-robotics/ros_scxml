@@ -430,7 +430,7 @@ Response StateMachine::executeAction(const Action& action)
   action_future_ = std::shared_future<Action>(action_promise.get_future());
   action_promise.set_value(action);
   response_promise_ = std::promise<Response>();
-  response_future_ = std::shared_future<Response>(response_promise_.get_future());
+  std::shared_future<Response> response_future = std::shared_future<Response>(response_promise_.get_future());
 
   // submitting event, entry callbacks registered in signalSetup() should be invoked
   LOG4CXX_DEBUG(logger_, "Submitting event with id: " << action.id);
@@ -443,7 +443,7 @@ Response StateMachine::executeAction(const Action& action)
   while (QTime::currentTime() < stop_time && !transition_made)
   {
     QCoreApplication::processEvents(QEventLoop::AllEvents, WAIT_QT_EVENTS);
-    transition_made = response_future_.wait_for(std::chrono::milliseconds(WAIT_QT_EVENTS)) == std::future_status::ready;
+    transition_made = response_future.wait_for(std::chrono::milliseconds(WAIT_QT_EVENTS)) == std::future_status::ready;
   }
 
   // resetting synchronization variables
@@ -474,7 +474,7 @@ Response StateMachine::executeAction(const Action& action)
   LOG4CXX_DEBUG(logger_, "State transitions completed");
 
   // retrieve response now
-  res = response_future_.get();
+  res = response_future.get();
   LOG4CXX_DEBUG(logger_, "Retrieved response structure from future");
   return std::move(res);
 }
