@@ -246,7 +246,6 @@ protected:
   std::atomic<bool> busy_consuming_entry_cb_;
 
   std::shared_future<Action> action_future_;
-  std::shared_future<Response> response_future_;
   std::promise<Response> response_promise_;
   std::map<std::string, PreconditionCallback> precond_callbacks_;
   std::map<std::string, EntryCbHandlerPtr> entry_callbacks_;
