@@ -10,13 +10,13 @@ Lightweight finite state machine library that uses the [SCXML](https://commons.a
 ## Prerequisites
 ### QT 5
   The QScxml library is only available from version Qt 5.7 and up, this implementation currently uses Qt 5.12.2 which
-  can be downloaded from [here](http://download.qt.io/official_releases/qt/5.12/5.12.2/).  Run the instalation script 
+  can be downloaded from [here](http://download.qt.io/official_releases/qt/5.12/5.12.2/).  Run the instalation script
   with root access and follow the on screen instructions.
-  In order properly configure this library for cmake and so that it can be used as a shared library then the `PATH` and `LD_LIBRARY_PATH` 
+  In order properly configure this library for cmake and so that it can be used as a shared library then the `CMAKE_MODULE_PATH` and `LD_LIBRARY_PATH`
   must be set.  For instance if you installed QT in the `/opt/QT` system directory then you would add set the variables as follows:
   ```
-  export PATH="/opt/Qt/5.12.2/gcc_64/lib/cmake:$PATH"
-  export LD_LIBRARY_PATH=/opt/Qt/5.12.2/gcc_64/lib:$LD_LIBRARY_PATH
+  export CMAKE_MODULE_PATH="<path>/<to>/<qt_5.12>/lib/cmake:$PATH"
+  export LD_LIBRARY_PATH=<path>/<to>/<qt_5.12>lib:$LD_LIBRARY_PATH
   ```
 
 ---
@@ -28,7 +28,7 @@ The `demo_scxml_state_machine` ROS node shows how to use the State Machine libra
   MockApplication process_app(nh);
   bool success = false;
   std::vector< std::function<bool ()> > functions = {
-  
+
     // custom function invoked when the "st3Reseting" state is entered
     [&]() -> bool{
       return sm->addEntryCallback("st3Reseting",[&](const Action& action) -> Response{
@@ -39,21 +39,21 @@ The `demo_scxml_state_machine` ROS node shows how to use the State Machine libra
         return true;
       },false); // false = runs sequentially, use for non-blocking functions
     },
-    
+
     // custom function invoked when the "st3Execute" state is entered
     [&]() -> bool{
       return sm->addEntryCallback("st3Execute",[&process_app](const Action& action) -> Response{
         return process_app.executeProcess();
       },true); // true = runs asynchronously, use for blocking functions
     },
-    
+
     // custom function invoked when the "st3Execute" state is exited
     [&]() -> bool{
       return sm->addExitCallback("st3Execute",[&process_app](){
         process_app.haltProcess();
       });
     },
-    
+
     // custom function invoked when the "st2Clearing" state is entered, it will exit after waiting for 3 seconds
     [&]() -> bool{
       return sm->addEntryCallback("st2Clearing",[&](const Action& action) -> Response{
@@ -78,11 +78,11 @@ The `demo_scxml_state_machine` ROS node shows how to use the State Machine libra
     catkin build
     ```
 
-#### colcon (ROS2)	
+#### colcon (ROS2)
 1. Build colcon environment
-	  ```
-	  colcon build --symlink-install
-	  ```
+    ```
+    colcon build --symlink-install
+    ```
 ---
 ### RUN Demo
 #### ROS 1
@@ -102,19 +102,19 @@ The `demo_scxml_state_machine` ROS node shows how to use the State Machine libra
     ```
 6. Call the service to print the available actions at the current state:
     ```
-    rosservice call /print_actions "{}" 
+    rosservice call /print_actions "{}"
     ```
-    
+
     The SM terminal should display something as follows:
     ```
-    SM Actions: 
-	    -userClear
-	    -trAborted
+    SM Actions:
+      -userClear
+      -trAborted
     ```
     This means that the actions available at the current state are **trAborted** and **userClear**
 7. Publish an action from the list to the state machine, for instance the **userClear** action will be requested as follows:
     ```
-    rostopic pub -1 /execute_state std_msgs/String "data: 'userClear'" 
+    rostopic pub -1 /execute_state std_msgs/String "data: 'userClear'"
     ```
 
     This should cause the state machine to go into the **st2Clearing** state.  A few seconds after that it should go into the **st2Stopped** state as the custom entry callback function automatically posts an action.
@@ -133,7 +133,7 @@ The `demo_scxml_state_machine` ROS node shows how to use the State Machine libra
     ```
 2. From another terminal echo the current state
     ```
-    ros2 topic echo /current_state 
+    ros2 topic echo /current_state
     ```
   You should get the name of the current state printed in the terminal
 
@@ -147,5 +147,5 @@ The `demo_scxml_state_machine` ROS node shows how to use the State Machine libra
     ```
     ros2 topic pub -1 /execute_action std_msgs/msg/String '{data: trAborted}'
     ```
-  If the action is valid you should see the following confirmation message in the node terminal 
+  If the action is valid you should see the following confirmation message in the node terminal
   *"Action trAborted successfully executed"*
