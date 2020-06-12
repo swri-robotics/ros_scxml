@@ -153,11 +153,13 @@ public:
   bool isRunning() const;
 
   /**
-   * @brief immediately execute the action
+   * @brief executes the action
    * @param action The action object
+   * @param force Ignores the action queue and forces the execution of the requested action, recommended
+   *              for critical tasks only.
    * @return  A response object
    */
-  Response execute(const Action& action);
+  Response execute(const Action& action, bool force = false);
 
   /**
    * @brief Adds the action to the queue
@@ -242,6 +244,7 @@ protected:
   // action execution members
   double event_loop_period_;
   QTimer* execute_action_timer_;
+  mutable std::mutex consuming_action_mutex_;;
   std::atomic<bool> busy_executing_action_;
   std::atomic<bool> busy_consuming_entry_cb_;
 
