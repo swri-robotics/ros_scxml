@@ -244,7 +244,8 @@ protected:
   // action execution members
   double event_loop_period_;
   QTimer* execute_action_timer_;
-  mutable std::mutex consuming_action_mutex_;;
+  mutable std::mutex consuming_action_mutex_;
+  ;
   std::atomic<bool> busy_executing_action_;
   std::atomic<bool> busy_consuming_entry_cb_;
 

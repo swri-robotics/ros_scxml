@@ -283,7 +283,7 @@ bool StateMachine::stop()
 
 Response StateMachine::execute(const Action& action, bool force)
 {
-  if(force)
+  if (force)
   {
     LOG4CXX_WARN(logger_, "Forcing action " << action.id);
     return executeAction(action);
