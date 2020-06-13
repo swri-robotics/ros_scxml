@@ -1,3 +1,3 @@
 /**:
   ros__parameters:
-    state_machine_file: resource/demo_packml_sm.scxml
+    state_machine_file: resource/demo_sm.scxml
