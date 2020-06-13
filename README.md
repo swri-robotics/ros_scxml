@@ -38,127 +38,132 @@ Lightweight finite state machine library that uses the [SCXML](https://commons.a
 ---
 ## Demo program
 ### Description
-The `demo_scxml_state_machine` ROS node shows how to use the State Machine library with ROS and process specific code.  A key part of this code is in the section that adds custom functions which get invoked when specific states are entered or exited; inspect this section in order to understand how this is accomplished:
-```cpp
-  // adding application methods to SM
-  MockApplication process_app(nh);
-  bool success = false;
-  std::vector<std::function<bool()> > functions = {
+- Demo State Machine Workflow (Produced from the scxml file with QT Creator)
+  ![SM](demo_sm.png)
 
-    // custom function invoked when the "st3Reseting" state is entered
-    [&]() -> bool {
-      return sm->addEntryCallback(
-          "st3Reseting",
-          [&](const Action& action) -> Response {
-            // checking passed user data first
-            if (!action.data.empty())
-            {
-              try
+- Implementation:
+  The `demo_scxml_state_machine` ROS node shows how to use the State Machine library with ROS and process specific code.  A key part of this code is in the section that adds custom functions which get invoked when specific states are entered or exited; inspect this section in order to understand how this is accomplished:
+
+  ```cpp
+    // adding application methods to SM
+    MockApplication process_app(nh);
+    bool success = false;
+    std::vector<std::function<bool()> > functions = {
+
+      // custom function invoked when the "st3Reseting" state is entered
+      [&]() -> bool {
+        return sm->addEntryCallback(
+            "st3Reseting",
+            [&](const Action& action) -> Response {
+              // checking passed user data first
+              if (!action.data.empty())
               {
-                double secs = boost::any_cast<double>(action.data);
-                ROS_INFO("State received time value of %f seconds", secs);
+                try
+                {
+                  double secs = boost::any_cast<double>(action.data);
+                  ROS_INFO("State received time value of %f seconds", secs);
+                }
+                catch (boost::bad_any_cast& e)
+                {
+                  ROS_WARN_STREAM(e.what());
+                }
               }
-              catch (boost::bad_any_cast& e)
-              {
-                ROS_WARN_STREAM(e.what());
-              }
-            }
 
-            process_app.resetProcess();
-            ros::Duration(3.0).sleep();
-            // queuing action, should exit the state
-            sm->postAction(Action{ .id = "trIdle" });
+              process_app.resetProcess();
+              ros::Duration(3.0).sleep();
+              // queuing action, should exit the state
+              sm->postAction(Action{ .id = "trIdle" });
+              return true;
+            },
+            false);  // false = runs sequentially, use for non-blocking functions
+      },
+
+      // custom function invoked when the "st3Execute" state is entered
+      [&]() -> bool {
+        return sm->addEntryCallback(
+            "st3Execute",
+            [&process_app](const Action& action) -> Response { return process_app.executeProcess(); },
+            true);  // true = runs asynchronously, use for blocking functions
+      },
+
+      // custom function invoked when the "st3Execute" state is exited
+      [&]() -> bool {
+        return sm->addExitCallback("st3Execute", [&process_app]() {
+          process_app.pauseProcess();
+          ROS_INFO_STREAM("Process counter at " << process_app.getCounter());
+        });
+      },
+
+      // custom function invoked prior to entering the "st3Completing" state
+      [&]() -> bool {
+        return sm->addPreconditionCallback("st3Completing", [&process_app](const Action& action) -> Response {
+          Response res;
+          static const int REQ_VAL = 16;
+          if (process_app.getCounter() >= REQ_VAL)
+          {
             return true;
-          },
-          false);  // false = runs sequentially, use for non-blocking functions
-    },
+          }
+          res.msg = boost::str(boost::format("Counter less than %i") % REQ_VAL);
+          res.success = false;
 
-    // custom function invoked when the "st3Execute" state is entered
-    [&]() -> bool {
-      return sm->addEntryCallback(
-          "st3Execute",
-          [&process_app](const Action& action) -> Response { return process_app.executeProcess(); },
-          true);  // true = runs asynchronously, use for blocking functions
-    },
+          return res;
+        });
+      },
 
-    // custom function invoked when the "st3Execute" state is exited
-    [&]() -> bool {
-      return sm->addExitCallback("st3Execute", [&process_app]() {
-        process_app.pauseProcess();
-        ROS_INFO_STREAM("Process counter at " << process_app.getCounter());
-      });
-    },
+      // custom function invoked when the "st3Suspending" state is entered
+      [&]() -> bool {
+        return sm->addEntryCallback(
+            "st3Suspending",
+            [&](const Action& action) -> Response {
+              ROS_INFO("Suspending process");
+              process_app.haltProcess();
+              ros::Duration(3.0).sleep();
 
-    // custom function invoked prior to entering the "st3Completing" state
-    [&]() -> bool {
-      return sm->addPreconditionCallback("st3Completing", [&process_app](const Action& action) -> Response {
-        Response res;
-        static const int REQ_VAL = 16;
-        if (process_app.getCounter() >= REQ_VAL)
-        {
-          return true;
-        }
-        res.msg = boost::str(boost::format("Counter less than %i") % REQ_VAL);
-        res.success = false;
+              // queuing action, should exit the state
+              sm->postAction(Action{ .id = "trSuspending" });
+              Response res;
+              res.success = true;
+              return std::move(res);
+            },
+            true);  // true = runs asynchronously, use for blocking functions
+      },
 
-        return res;
-      });
-    },
+      // custom function invoked when the "st3Completing" state is entered
+      [&]() -> bool {
+        return sm->addEntryCallback(
+            "st3Completing",
+            [&process_app](const Action& action) -> Response {
+              Response res;
+              res.success = true;
+              res.data = ros::Time::now().toSec();
+              return std::move(res);
+            },
+            false);  // true = runs asynchronously, use for blocking functions
+      },
 
-    // custom function invoked when the "st3Suspending" state is entered
-    [&]() -> bool {
-      return sm->addEntryCallback(
-          "st3Suspending",
-          [&](const Action& action) -> Response {
-            ROS_INFO("Suspending process");
-            process_app.haltProcess();
-            ros::Duration(3.0).sleep();
+      // custom function invoked when the "st2Clearing" state is entered, it will exit after waiting for 3 seconds
+      [&]() -> bool {
+        return sm->addEntryCallback(
+            "st2Clearing",
+            [&](const Action& action) -> Response {
+              ROS_INFO("Clearing to enable process, please wait ...");
+              ros::Duration(3.0).sleep();
 
-            // queuing action, should exit the state
-            sm->postAction(Action{ .id = "trSuspending" });
-            Response res;
-            res.success = true;
-            return std::move(res);
-          },
-          true);  // true = runs asynchronously, use for blocking functions
-    },
+              // queuing action, should exit the state
+              sm->postAction(Action{ .id = "trStopped" });
+              return true;
+            },
+            true);  // true = runs asynchronously, use for blocking functions
+      },
 
-    // custom function invoked when the "st3Completing" state is entered
-    [&]() -> bool {
-      return sm->addEntryCallback(
-          "st3Completing",
-          [&process_app](const Action& action) -> Response {
-            Response res;
-            res.success = true;
-            res.data = ros::Time::now().toSec();
-            return std::move(res);
-          },
-          false);  // true = runs asynchronously, use for blocking functions
-    },
+      // custom function invoked when the "st2Clearing" state is exited
+      [&]() -> bool {
+        return sm->addExitCallback("st2Clearing",
+                                   [&process_app]() { ROS_INFO("Done Clearing, Process is now good to go ..."); });
+      },
+    };
 
-    // custom function invoked when the "st2Clearing" state is entered, it will exit after waiting for 3 seconds
-    [&]() -> bool {
-      return sm->addEntryCallback(
-          "st2Clearing",
-          [&](const Action& action) -> Response {
-            ROS_INFO("Clearing to enable process, please wait ...");
-            ros::Duration(3.0).sleep();
-
-            // queuing action, should exit the state
-            sm->postAction(Action{ .id = "trStopped" });
-            return true;
-          },
-          true);  // true = runs asynchronously, use for blocking functions
-    },
-
-    // custom function invoked when the "st2Clearing" state is exited
-    [&]() -> bool {
-      return sm->addExitCallback("st2Clearing",
-                                 [&process_app]() { ROS_INFO("Done Clearing, Process is now good to go ..."); });
-    },
-  };
-
-```
+  ```
 
 ---
 ### Workspace Setup
