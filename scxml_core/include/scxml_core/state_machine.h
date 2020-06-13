@@ -168,7 +168,7 @@ public:
   void postAction(Action action);
 
   /**
-   * @brief adds a callback that gets invoked to check for pre-conditions prior to making a transition.
+   * @brief adds a callback that gets invoked to check for pre-conditions prior to transitioning into a state.
    * When the callback returns a valid result then the transition proceeds, otherwise the transition is
    * negated.
    * @param st_name The name of the state
@@ -178,18 +178,18 @@ public:
   bool addPreconditionCallback(const std::string& st_name, PreconditionCallback cb);
 
   /**
-   * @brief adds an callback that gets invoked when a state is entered
+   * @brief adds a callback that gets invoked when a state is entered
    * @param st_name         The name of the state
    * @param cb              The callback to be invoked; it can be a blocking function.
-   * @param async_execution Set to true for blocking callbacks; the callback will be executed asynchronously
+   * @param async_execution Set to true for long running blocking tasks; the callback will be executed asynchronously
    * @return  True on success, false otherwise
    */
-  bool addEntryCallback(const std::string& st_name, EntryCallback cb, bool async_execution = false);
+  bool addEntryCallback(const std::string& st_name, EntryCallback cb, bool async_execution = true);
 
   /**
-   * @brief adds an callback that gets invoked when a state is exited
+   * @brief adds a callback that gets invoked when a state is exited
    * @param st_name The name of the state
-   * @param cb      The callback to be invoked; it must be a non-blocking function.
+   * @param cb      The callback to be invoked; long running blocking functions are not recommended.
    * @return  True on success, false otherwise
    */
   bool addExitCallback(const std::string& st_name, std::function<void()> cb);
