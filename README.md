@@ -9,32 +9,33 @@ Lightweight finite state machine library that uses the [SCXML](https://commons.a
 ---
 ## Prerequisites
 ### QT 5
-  The QScxml library is only available from version Qt 5.7 and up, this implementation currently uses Qt 5.12.2 or above.
+The QScxml library is only available from version Qt 5.7 and higher. This implementation currently uses Qt 5.12.2 or above.
   
-#### Recommended Download
-- Go into launchpad https://launchpad.net/~beineri
-- Select the QT (5.12 or above) version for your system
-    - If using using Ubuntu 18.04 QT 5.13.x is recomended
-- Add the PPA as described; WARNING: Edit command below to match the version of qt thot you'd like to install
-    ```
+#### Recommended Download (PPA)
+- [This PPA](https://launchpad.net/~beineri) provides binary distributions of various versions of Qt for various operating systems
+    - On the PPA site, select the QT (5.12 or above) version for your system
+        - Qt 5.13.x is recommended for Ubuntu 18.04
+- Add the PPA
+    ```bash
     sudo add-apt-repository ppa:beineri/opt-qt-5.13.2-bionic
     sudo apt-get update
     ```
-- Install qt513-meta-full 
+    > Note: Edit command below to match the version of qt that you'd like to install
+- Install the full Qt library 
     ```
     sudo apt install qt513-meta-full
     ```
-#### Alternative Download
-  - The library can be downloaded from [here](http://download.qt.io/official_releases/qt/).  Run the instalation script with root access and follow the on screen instructions.
+#### Alternative Download (Qt Installer)
+- The library can be downloaded from [here](http://download.qt.io/official_releases/qt/).  Run the installation script with root access and follow the on screen instructions.
   
 #### Setup environment variables
-  In order to make this library accessible to cmake the `PATH` and `LD_LIBRARY_PATH` environment variables must be set.  Locate your qt installation directory (usually in the */opt* directory) and set the environment variables as follows:
-  ```
-    export PATH="/opt/qt513/lib/cmake:$PATH"
-    export LD_LIBRARY_PATH=/opt/qt513/lib:$LD_LIBRARY_PATH
-    export LD_LIBRARY_PATH=/opt/qt513/plugins:$LD_LIBRARY_PATH
-  ```
+In order to make this library accessible to cmake the `CMAKE_MODULE_PATH` and `LD_LIBRARY_PATH` environment variables must be set.  Locate your Qt installation directory (usually in the */opt* directory) and set the environment variables as follows:
 
+```bash
+export CMAKE_MODULE_PATH=<path>/<to>/<qt>/lib/cmake:$PATH
+export LD_LIBRARY_PATH=<path>/<to>/<qt>/lib:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=<path>/<to>/<qt>/plugins:$LD_LIBRARY_PATH  
+```
 ---
 ## Demo program
 ### Description
@@ -174,11 +175,11 @@ Lightweight finite state machine library that uses the [SCXML](https://commons.a
     catkin build
     ```
 
-#### colcon (ROS2)	
+#### colcon (ROS2)
 1. Build colcon environment
-	  ```
-	  colcon build --symlink-install
-	  ```
+    ```
+    colcon build --symlink-install
+    ```
 ---
 ### RUN Demo
 #### ROS 1
@@ -198,19 +199,19 @@ Lightweight finite state machine library that uses the [SCXML](https://commons.a
     ```
 6. Call the service to print the available actions at the current state:
     ```
-    rosservice call /print_actions "{}" 
+    rosservice call /print_actions "{}"
     ```
-    
+
     The SM terminal should display something as follows:
     ```
-    SM Actions: 
-	    -userClear
-	    -trAborted
+    SM Actions:
+      -userClear
+      -trAborted
     ```
     This means that the actions available at the current state are **trAborted** and **userClear**
 7. Publish an action from the list to the state machine, for instance the **userClear** action will be requested as follows:
     ```
-    rostopic pub -1 /execute_state std_msgs/String "data: 'userClear'" 
+    rostopic pub -1 /execute_state std_msgs/String "data: 'userClear'"
     ```
 
     This should cause the state machine to go into the **st2Clearing** state.  A few seconds after that it should go into the **st2Stopped** state as the custom entry callback function automatically posts an action.
@@ -229,7 +230,7 @@ Lightweight finite state machine library that uses the [SCXML](https://commons.a
     ```
 2. From another terminal echo the current state
     ```
-    ros2 topic echo /current_state 
+    ros2 topic echo /current_state
     ```
   You should get the name of the current state printed in the terminal
 
@@ -243,5 +244,5 @@ Lightweight finite state machine library that uses the [SCXML](https://commons.a
     ```
     ros2 topic pub -1 /execute_action std_msgs/msg/String '{data: trAborted}'
     ```
-  If the action is valid you should see the following confirmation message in the node terminal 
+  If the action is valid you should see the following confirmation message in the node terminal
   *"Action trAborted successfully executed"*
