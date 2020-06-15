@@ -281,8 +281,14 @@ bool StateMachine::stop()
   return true;
 }
 
-Response StateMachine::execute(const Action& action)
+Response StateMachine::execute(const Action& action, bool force)
 {
+  if (force)
+  {
+    LOG4CXX_WARN(logger_, "Forcing action " << action.id);
+    return executeAction(action);
+  }
+
   if (busy_executing_action_ || busy_consuming_entry_cb_)
   {
     Response res = Response(false, boost::any(), "SM is busy");
@@ -358,6 +364,8 @@ void StateMachine::processQueuedActions()
 
 Response StateMachine::executeAction(const Action& action)
 {
+  std::lock_guard<std::mutex> lock(consuming_action_mutex_);
+
   ScopeExit scope_exit(&this->busy_executing_action_);  // sets the flag to busy
 
   Response res;

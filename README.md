@@ -9,65 +9,162 @@ Lightweight finite state machine library that uses the [SCXML](https://commons.a
 ---
 ## Prerequisites
 ### QT 5
-  The QScxml library is only available from version Qt 5.7 and up, this implementation currently uses Qt 5.12.2 which
-  can be downloaded from [here](http://download.qt.io/official_releases/qt/5.12/5.12.2/).  Run the instalation script
-  with root access and follow the on screen instructions.
-  In order properly configure this library for cmake and so that it can be used as a shared library then the `CMAKE_MODULE_PATH` and `LD_LIBRARY_PATH`
-  must be set.  For instance if you installed QT in the `/opt/QT` system directory then you would add set the variables as follows:
-  ```
-  export CMAKE_MODULE_PATH="<path>/<to>/<qt_5.12>/lib/cmake:$PATH"
-  export LD_LIBRARY_PATH=<path>/<to>/<qt_5.12>lib:$LD_LIBRARY_PATH
-  ```
+The QScxml library is only available from version Qt 5.7 and higher. This implementation currently uses Qt 5.12.2 or above.
+  
+#### Recommended Download (PPA)
+- [This PPA](https://launchpad.net/~beineri) provides binary distributions of various versions of Qt for various operating systems
+    - On the PPA site, select the QT (5.12 or above) version for your system
+        - Qt 5.13.x is recommended for Ubuntu 18.04
+- Add the PPA
+    ```bash
+    sudo add-apt-repository ppa:beineri/opt-qt-5.13.2-bionic
+    sudo apt-get update
+    ```
+    > Note: Edit command below to match the version of qt that you'd like to install
+- Install the full Qt library 
+    ```
+    sudo apt install qt513-meta-full
+    ```
+#### Alternative Download
+- The library can be downloaded from [here](http://download.qt.io/official_releases/qt/).  Run the installation script with root access and follow the on screen instructions.
+  
+#### Setup environment variables
+In order to make this library accessible to cmake the `CMAKE_MODULE_PATH` and `LD_LIBRARY_PATH` environment variables must be set.  Locate your Qt installation directory (usually in the */opt* directory) and set the environment variables as follows:
 
+```bash
+export CMAKE_MODULE_PATH="<path>/<to>/<qt>/lib/cmake:$PATH"
+export LD_LIBRARY_PATH=<path>/<to>/<qt>/lib:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=<path>/<to>/<qt>/plugins:$LD_LIBRARY_PATH  
+```
 ---
 ## Demo program
 ### Description
-The `demo_scxml_state_machine` ROS node shows how to use the State Machine library with ROS and process specific code.  A key part of this code is in the section that adds custom functions which get invoked when specific states are entered or exited; inspect this section in order to understand how this is accomplished:
-```cpp
-  // adding application methods to SM
-  MockApplication process_app(nh);
-  bool success = false;
-  std::vector< std::function<bool ()> > functions = {
+- Demo State Machine Workflow (Produced from the scxml file with QT Creator)
+  ![SM](demo_sm.png)
 
-    // custom function invoked when the "st3Reseting" state is entered
-    [&]() -> bool{
-      return sm->addEntryCallback("st3Reseting",[&](const Action& action) -> Response{
-        process_app.resetProcess();
-        ros::Duration(3.0).sleep();
-        // queuing action, should exit the state
-        sm->postAction(Action{.id="trIdle"});
-        return true;
-      },false); // false = runs sequentially, use for non-blocking functions
-    },
+- Implementation:
+  The `demo_scxml_state_machine` ROS node shows how to use the State Machine library with ROS and process specific code.  A key part of this code is in the section that adds custom functions which get invoked when specific states are entered or exited; inspect this section in order to understand how this is accomplished:
 
-    // custom function invoked when the "st3Execute" state is entered
-    [&]() -> bool{
-      return sm->addEntryCallback("st3Execute",[&process_app](const Action& action) -> Response{
-        return process_app.executeProcess();
-      },true); // true = runs asynchronously, use for blocking functions
-    },
+  ```cpp
+    // adding application methods to SM
+    MockApplication process_app(nh);
+    bool success = false;
+    std::vector<std::function<bool()> > functions = {
 
-    // custom function invoked when the "st3Execute" state is exited
-    [&]() -> bool{
-      return sm->addExitCallback("st3Execute",[&process_app](){
-        process_app.haltProcess();
-      });
-    },
+      // custom function invoked when the "st3Reseting" state is entered
+      [&]() -> bool {
+        return sm->addEntryCallback(
+            "st3Reseting",
+            [&](const Action& action) -> Response {
+              // checking passed user data first
+              if (!action.data.empty())
+              {
+                try
+                {
+                  double secs = boost::any_cast<double>(action.data);
+                  ROS_INFO("State received time value of %f seconds", secs);
+                }
+                catch (boost::bad_any_cast& e)
+                {
+                  ROS_WARN_STREAM(e.what());
+                }
+              }
 
-    // custom function invoked when the "st2Clearing" state is entered, it will exit after waiting for 3 seconds
-    [&]() -> bool{
-      return sm->addEntryCallback("st2Clearing",[&](const Action& action) -> Response{
-        ROS_INFO("Clearing to enable process, please wait ...");
-        ros::Duration(3.0).sleep();
-        ROS_INFO("Done Clearing");
+              process_app.resetProcess();
+              ros::Duration(3.0).sleep();
+              // queuing action, should exit the state
+              sm->postAction(Action{ .id = "trIdle" });
+              return true;
+            },
+            false);  // false = runs sequentially, use for non-blocking functions
+      },
 
-        // queuing action, should exit the state
-        sm->postAction(Action{.id="trStopped"});
-        return true;
-      }, true); // true = runs asynchronously, use for blocking functions
-    }
-  };
-```
+      // custom function invoked when the "st3Execute" state is entered
+      [&]() -> bool {
+        return sm->addEntryCallback(
+            "st3Execute",
+            [&process_app](const Action& action) -> Response { return process_app.executeProcess(); },
+            true);  // true = runs asynchronously, use for blocking functions
+      },
+
+      // custom function invoked when the "st3Execute" state is exited
+      [&]() -> bool {
+        return sm->addExitCallback("st3Execute", [&process_app]() {
+          process_app.pauseProcess();
+          ROS_INFO_STREAM("Process counter at " << process_app.getCounter());
+        });
+      },
+
+      // custom function invoked prior to entering the "st3Completing" state
+      [&]() -> bool {
+        return sm->addPreconditionCallback("st3Completing", [&process_app](const Action& action) -> Response {
+          Response res;
+          static const int REQ_VAL = 16;
+          if (process_app.getCounter() >= REQ_VAL)
+          {
+            return true;
+          }
+          res.msg = boost::str(boost::format("Counter less than %i") % REQ_VAL);
+          res.success = false;
+
+          return res;
+        });
+      },
+
+      // custom function invoked when the "st3Suspending" state is entered
+      [&]() -> bool {
+        return sm->addEntryCallback(
+            "st3Suspending",
+            [&](const Action& action) -> Response {
+              ROS_INFO("Suspending process");
+              process_app.haltProcess();
+              ros::Duration(3.0).sleep();
+
+              // queuing action, should exit the state
+              sm->postAction(Action{ .id = "trSuspending" });
+              Response res;
+              res.success = true;
+              return std::move(res);
+            },
+            true);  // true = runs asynchronously, use for blocking functions
+      },
+
+      // custom function invoked when the "st3Completing" state is entered
+      [&]() -> bool {
+        return sm->addEntryCallback(
+            "st3Completing",
+            [&process_app](const Action& action) -> Response {
+              Response res;
+              res.success = true;
+              res.data = ros::Time::now().toSec();
+              return std::move(res);
+            },
+            false);  // true = runs asynchronously, use for blocking functions
+      },
+
+      // custom function invoked when the "st2Clearing" state is entered, it will exit after waiting for 3 seconds
+      [&]() -> bool {
+        return sm->addEntryCallback(
+            "st2Clearing",
+            [&](const Action& action) -> Response {
+              ROS_INFO("Clearing to enable process, please wait ...");
+              ros::Duration(3.0).sleep();
+
+              // queuing action, should exit the state
+              sm->postAction(Action{ .id = "trStopped" });
+              return true;
+            },
+            true);  // true = runs asynchronously, use for blocking functions
+      },
+
+      // custom function invoked when the "st2Clearing" state is exited
+      [&]() -> bool {
+        return sm->addExitCallback("st2Clearing",
+                                   [&process_app]() { ROS_INFO("Done Clearing, Process is now good to go ..."); });
+      },
+    };
+
+  ```
 
 ---
 ### Workspace Setup
@@ -89,12 +186,12 @@ The `demo_scxml_state_machine` ROS node shows how to use the State Machine libra
 1. Start the roscore
 2. Go to the resource directory:
     ```
-    roscd ros_scxml/resource/
+    roscd roscpp_scxml_demos/resource/
     ```
 3. Open the **demo_packml_sm.scxml** file with QTCreator to display a graphical depiction of the SM workflow.
 4. Run the node with the demo scxml file:
     ```
-   rosrun ros_scxml demo_scxml_state_machine _state_machine_file:=demo_packml_sm.scxml
+   rosrun roscpp_scxml_demos demo_scxml_state_machine _state_machine_file:=demo_sm.scxml
     ```
 5. Echo the current state:
     ```
