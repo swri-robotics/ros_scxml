@@ -25,14 +25,14 @@ The QScxml library is only available from version Qt 5.7 and higher. This implem
     ```
     sudo apt install qt513-meta-full
     ```
-#### Alternative Download
+#### Alternative Download (Qt Installer)
 - The library can be downloaded from [here](http://download.qt.io/official_releases/qt/).  Run the installation script with root access and follow the on screen instructions.
   
 #### Setup environment variables
 In order to make this library accessible to cmake the `CMAKE_MODULE_PATH` and `LD_LIBRARY_PATH` environment variables must be set.  Locate your Qt installation directory (usually in the */opt* directory) and set the environment variables as follows:
 
 ```bash
-export CMAKE_MODULE_PATH="<path>/<to>/<qt>/lib/cmake:$PATH"
+export CMAKE_MODULE_PATH=<path>/<to>/<qt>/lib/cmake:$PATH
 export LD_LIBRARY_PATH=<path>/<to>/<qt>/lib:$LD_LIBRARY_PATH
 export LD_LIBRARY_PATH=<path>/<to>/<qt>/plugins:$LD_LIBRARY_PATH  
 ```
