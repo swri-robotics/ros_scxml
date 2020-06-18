@@ -395,7 +395,7 @@ std::shared_future<Response> StateMachine::executeAction(const Action& action)
 
   Response res;
   std::promise<Response> res_promise;
-  std::future<Response> res_fut(res_promise.get_future());
+  std::shared_future<Response> res_fut(res_promise.get_future());
 
   // get transitions and check their events
   std::vector<int> transition_ids = getValidTransitionIDs();
@@ -524,7 +524,7 @@ std::shared_future<Response> StateMachine::executeAction(const Action& action)
   for(auto& kv : futures_map)
   {
     int state_id = kv.first;
-    QFuture<Response>& future = kv.second;
+    std::shared_future<Response>& future = kv.second;
 /*    while (!future.isFinished())
     {
       QCoreApplication::processEvents(QEventLoop::AllEvents, WAIT_QT_EVENTS);
@@ -532,9 +532,10 @@ std::shared_future<Response> StateMachine::executeAction(const Action& action)
 
     if(sm_private_->m_stateTable->state(state_id).isAtomic())
     {
-      res_fut = std::async(std::launch::async, [future](){
+/*      res_fut = std::async(std::launch::async, [future](){
         return future.result();
-      });
+      });*/
+      res_fut = future;
     }
     const std::string& st_name = sm_info_->stateName(state_id).toStdString();
     LOG4CXX_DEBUG(logger_, "Finished executing entry callback for state "<<st_name);
@@ -575,7 +576,7 @@ void StateMachine::signalSetup()
     ResponseFuturesMap futures_map;
     for (int id : states)
     {
-      QFuture<Response> temp_res_future;
+      std::shared_future<Response> temp_res_future;
       const std::string& st_name = sm_info_->stateName(id).toStdString();
       if (entry_callbacks_.count(st_name) > 0)
       {
