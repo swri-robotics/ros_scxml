@@ -40,6 +40,7 @@
 #include <mutex>
 #include <memory>
 #include <deque>
+#include <future>
 #include <QScxmlStateMachine>
 #include <private/qscxmlstatemachineinfo_p.h>
 #include <private/qscxmlstatemachine_p.h>
@@ -118,19 +119,17 @@ private:
     {
     }
 
-    Response operator()(const Action& arg)
+    QFuture<Response> operator()(const Action& arg)
     {
-      Response res;
-      if (async_execution_)
+      QFuture<Response> future = QtConcurrent::run(tpool_, [this, arg]() { return cb_(arg); });
+/*      while(!future.isFinished())
       {
-        QFuture<Response> future = QtConcurrent::run(tpool_, [this, arg]() { return cb_(arg); });
-        res = true;
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
       }
-      else
-      {
-        res = cb_(arg);
-      }
-      return std::move(res);
+      //future.waitForFinished();
+      Response res = future.result();
+      return std::move(res);*/
+      return future;
     }
 
   private:
@@ -159,7 +158,7 @@ public:
    *              for critical tasks only.
    * @return  A response object
    */
-  Response execute(const Action& action, bool force = false);
+  std::shared_future<Response> execute(const Action& action, bool force = false);
 
   /**
    * @brief Adds the action to the queue
@@ -181,10 +180,12 @@ public:
    * @brief adds a callback that gets invoked when a state is entered
    * @param st_name         The name of the state
    * @param cb              The callback to be invoked; it can be a blocking function.
-   * @param async_execution Set to true for long running blocking tasks; the callback will be executed asynchronously
+   * @param async_execution The callback will be executed asynchronously however the result returned by the
+   *                        callback won't be forwarded by the < b>execute()< /b> method back to the client
+   *                         code.
    * @return  True on success, false otherwise
    */
-  bool addEntryCallback(const std::string& st_name, EntryCallback cb, bool async_execution = true);
+  bool addEntryCallback(const std::string& st_name, EntryCallback cb, bool async_execution = false);
 
   /**
    * @brief adds a callback that gets invoked when a state is exited
@@ -226,7 +227,7 @@ signals:
 protected:
   void signalSetup();
   bool emitStateEnteredSignal();
-  Response executeAction(const Action& action);
+  std::shared_future<Response> executeAction(const Action& action);
   void processQueuedActions();
   std::vector<int> getTransitionsIDs(const QVector<int>& states) const;
   std::vector<int> getValidTransitionIDs() const;
@@ -250,11 +251,13 @@ protected:
   std::atomic<bool> busy_consuming_entry_cb_;
 
   std::shared_future<Action> action_future_;
-  std::promise<Response> response_promise_;
+  using ResponseFuturesMap = std::map<int,QFuture<Response>>;
+  std::promise< ResponseFuturesMap > response_transition_;
   std::map<std::string, PreconditionCallback> precond_callbacks_;
   std::map<std::string, EntryCbHandlerPtr> entry_callbacks_;
   std::map<std::string, std::function<void()> > exit_callbacks_;
   QThreadPool* async_thread_pool_;
+  QThreadPool* async_processing_pool_;
   mutable std::mutex entered_states_mutex_;
   std::deque<QScxmlStateMachineInfo::StateId> entered_states_queue_;
   log4cxx::LoggerPtr logger_;
