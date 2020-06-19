@@ -204,9 +204,9 @@ std::shared_future<Response> StateMachine::EntryCbHandler::operator()(const Acti
   promise_res_ = std::make_shared<std::promise<Response>>();
   std::shared_future<Response> future_res(promise_res_->get_future());
 
-  if (async_execution_)
+  if (discard_response_)
   {
-    // run in qt thread and return unbinded Response
+    // run in qt thread and return unbinded Response future
     QtConcurrent::run(tpool_, [this, arg]() { return cb_(arg); });
     Response res = true;
     promise_res_->set_value(res);
@@ -633,7 +633,7 @@ bool StateMachine::addPreconditionCallback(const std::string& st_name, Precondit
   return true;
 }
 
-bool StateMachine::addEntryCallback(const std::string& st_name, EntryCallback cb, bool async_execution)
+bool StateMachine::addEntryCallback(const std::string& st_name, EntryCallback cb, bool discard_response)
 {
   if (!hasState(st_name))
   {
@@ -646,7 +646,7 @@ bool StateMachine::addEntryCallback(const std::string& st_name, EntryCallback cb
     LOG4CXX_WARN(logger_, boost::str(boost::format("Entry callback for state %s will be replaced") % st_name));
   }
   entry_callbacks_.insert(
-      std::make_pair(st_name, std::make_shared<EntryCbHandler>(async_thread_pool_, cb, async_execution)));
+      std::make_pair(st_name, std::make_shared<EntryCbHandler>(async_thread_pool_, cb, discard_response)));
 
   return true;
 }

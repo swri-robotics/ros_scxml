@@ -114,8 +114,8 @@ private:
   class EntryCbHandler
   {
   public:
-    EntryCbHandler(QThreadPool* thread_pool, EntryCallback cb, bool async_execution = false)
-      : cb_(cb), async_execution_(async_execution), tpool_(thread_pool)
+    EntryCbHandler(QThreadPool* thread_pool, EntryCallback cb, bool discard_response = false)
+      : cb_(cb), discard_response_(discard_response), tpool_(thread_pool)
     {
     }
 
@@ -127,7 +127,7 @@ private:
     std::shared_future<Response> operator()(const Action& arg);
 
   private:
-    bool async_execution_;
+    bool discard_response_;
     EntryCallback cb_;
     QThreadPool* tpool_;
     std::shared_ptr<std::promise<Response>> promise_res_ = std::make_shared<std::promise<Response>>();
@@ -166,21 +166,20 @@ public:
    * When the callback returns a valid result then the transition proceeds, otherwise the transition is
    * negated.
    * @param st_name The name of the state
-   * @param cb      The callback to be invoked; it must be a non-blocking function.
+   * @param cb      The callback to be invoked; long running blocking functions are not recommended.
    * @return  True on success, false otherwise
    */
   bool addPreconditionCallback(const std::string& st_name, PreconditionCallback cb);
 
   /**
-   * @brief adds a callback that gets invoked when a state is entered
-   * @param st_name         The name of the state
-   * @param cb              The callback to be invoked; it can be a blocking function.
-   * @param async_execution The callback will be executed asynchronously however the result returned by the
-   *                        callback won't be forwarded by the < b>execute()< /b> method back to the client
-   *                         code.
+   * @brief adds a callback that gets invoked asynchronously when a state is entered
+   * @param st_name           The name of the state
+   * @param cb                The callback to be invoked; it can be a blocking function.
+   * @param discard_response  When true the callback will be executed asynchronously however the Response returned by
+   * the callback won't be forwarded by the < b>execute()< /b> method back to the client code.
    * @return  True on success, false otherwise
    */
-  bool addEntryCallback(const std::string& st_name, EntryCallback cb, bool async_execution = false);
+  bool addEntryCallback(const std::string& st_name, EntryCallback cb, bool discard_response = false);
 
   /**
    * @brief adds a callback that gets invoked when a state is exited
