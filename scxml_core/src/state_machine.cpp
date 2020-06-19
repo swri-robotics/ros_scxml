@@ -214,7 +214,16 @@ std::shared_future<Response> StateMachine::EntryCbHandler::operator()(const Acti
   else
   {
     // run in qt thread and bind Response to future that gets forwarded to client code
-    QtConcurrent::run(tpool_, [this, arg]() { promise_res_->set_value(cb_(arg)); });
+    QtConcurrent::run(tpool_, [this, arg]() {
+      try
+      {
+        promise_res_->set_value(cb_(arg));
+      }
+      catch (std::future_error& e)
+      {
+        // Promise in entry callback already satisfied, no action needed
+      }
+    });
   }
 
   return future_res;

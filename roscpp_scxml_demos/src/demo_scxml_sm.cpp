@@ -269,7 +269,7 @@ int main(int argc, char** argv)
             ros::Duration(3.0).sleep();
             // queuing action, should exit the state
             sm->postAction(Action{ .id = "trIdle" });
-            return true;
+            return Response(true, 22.0);
           },
           false);  // false = runs sequentially, use for non-blocking functions
     },
