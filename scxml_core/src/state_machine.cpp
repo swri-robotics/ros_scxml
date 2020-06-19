@@ -200,7 +200,6 @@ std::shared_future<Response> StateMachine::EntryCbHandler::operator()(const Acti
   });
   qfuture.waitForFinished();
 
-
   // create promise and future to be forwarded
   promise_res_ = std::make_shared<std::promise<Response>>();
   std::shared_future<Response> future_res(promise_res_->get_future());
@@ -215,9 +214,7 @@ std::shared_future<Response> StateMachine::EntryCbHandler::operator()(const Acti
   else
   {
     // run in qt thread and bind Response to future that gets forwarded to client code
-    QtConcurrent::run(tpool_, [this, arg]() {
-      promise_res_->set_value( cb_(arg));
-    });
+    QtConcurrent::run(tpool_, [this, arg]() { promise_res_->set_value(cb_(arg)); });
   }
 
   return future_res;

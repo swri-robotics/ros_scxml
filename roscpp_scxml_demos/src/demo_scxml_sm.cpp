@@ -74,7 +74,15 @@ public:
             return;
           }
 
-          Response res = sm_->execute(Action{ .id = msg->data, .data = ros::Time::now().toSec() });
+          std::shared_future<Response> res_fut =
+              sm_->execute(Action{ .id = msg->data, .data = ros::Time::now().toSec() });
+          if (res_fut.wait_for(std::chrono::seconds(5)) != std::future_status::ready)
+          {
+            ROS_INFO("Took too long to get response");
+            return;
+          }
+
+          Response res = res_fut.get();
           if (!res)
           {
             return;
