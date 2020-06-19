@@ -120,56 +120,12 @@ private:
     {
     }
 
-    std::shared_future<Response> operator()(const Action& arg)
-    {
-      //QFuture<Response> qfuture = QtConcurrent::run(tpool_, [this, arg]() { return cb_(arg); });
-/*      while(!future.isFinished())
-      {
-        QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
-      }*/
-      //future.waitForFinished();
-/*      Response res = future.result();
-      return std::move(res);
-
-      std::shared_future<Response> future= std::async(std::launch::async, [this, arg]() { return cb_(arg); });*/
-      //fut_watcher_ = ;
-
-      fut_watcher_->disconnect();
-      if(qfuture)
-      {
-        delete qfuture;
-        qfuture = nullptr;
-      }
-
-      try
-      {
-        promise_res->set_value(Response(false));
-      }
-      catch(std::future_error& e)
-      {
-        // do nothing
-      }
-
-      promise_res = std::make_shared<std::promise<Response>>();
-      std::shared_future<Response> future_res(promise_res->get_future());
-
-      if(async_execution_)
-      {
-        QtConcurrent::run(tpool_, [this, arg]() { return cb_(arg); });
-        Response res = true;
-        promise_res->set_value(res);
-      }
-      else
-      {
-        qfuture = new QFuture<Response>(QtConcurrent::run(tpool_, [this, arg]() { return cb_(arg); }));;
-        connect(fut_watcher_, &QFutureWatcher<Response>::finished,[this](){
-          promise_res->set_value(fut_watcher_->result());
-        });
-        fut_watcher_->setFuture(*qfuture);
-      }
-
-      return future_res;
-    }
+    /**
+     * @brief invokes the state entry callback
+     * @param arg The action
+     * @return a future binded to the Response returned by the entry callback
+     */
+    std::shared_future<Response> operator()(const Action& arg);
 
   private:
     bool async_execution_;
@@ -288,18 +244,17 @@ protected:
   double event_loop_period_;
   QTimer* execute_action_timer_;
   mutable std::mutex consuming_action_mutex_;
-  ;
+
   std::atomic<bool> busy_executing_action_;
   std::atomic<bool> busy_consuming_entry_cb_;
 
   std::shared_future<Action> action_future_;
   using ResponseFuturesMap = std::map<int, std::shared_future<Response>>;
-  std::promise< ResponseFuturesMap > response_transition_;
+  std::promise< ResponseFuturesMap > responses_map_promise_;
   std::map<std::string, PreconditionCallback> precond_callbacks_;
   std::map<std::string, EntryCbHandlerPtr> entry_callbacks_;
   std::map<std::string, std::function<void()> > exit_callbacks_;
   QThreadPool* async_thread_pool_;
-  QThreadPool* async_processing_pool_;
   mutable std::mutex entered_states_mutex_;
   std::deque<QScxmlStateMachineInfo::StateId> entered_states_queue_;
   log4cxx::LoggerPtr logger_;

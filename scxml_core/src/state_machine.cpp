@@ -44,7 +44,6 @@
 #include <log4cxx/patternlayout.h>
 #include <log4cxx/consoleappender.h>
 
-static const std::string AUTO_INIT_ACTION = "auto_init";
 static const int WAIT_TRANSITION_PERIOD = 1000;                   // ms
 static const int WAIT_QT_EVENTS = WAIT_TRANSITION_PERIOD / 40.0;  // ms
 
@@ -55,7 +54,7 @@ log4cxx::LoggerPtr createConsoleLogger(const std::string& logger_name)
   ConsoleAppenderPtr console_appender(new ConsoleAppender(pattern_layout));
   log4cxx::LoggerPtr logger(Logger::getLogger(logger_name));
   logger->addAppender(console_appender);
-  logger->setLevel(Level::getDebug());
+  logger->setLevel(Level::getInfo());
   return logger;
 }
 
@@ -186,12 +185,55 @@ TransitionTable buildTransitionTable(const QScxmlStateMachineInfo* sm_info)
   return std::move(table);
 }
 
+std::shared_future<Response> StateMachine::EntryCbHandler::operator()(const Action& arg)
+{
+  // clean up previous operation
+  fut_watcher_->disconnect();
+  if(qfuture)
+  {
+    delete qfuture;
+    qfuture = nullptr;
+  }
+
+  // forward failed Response to any futures that may be waiting
+  try
+  {
+    promise_res->set_value(Response(false));
+  }
+  catch(std::future_error& e)
+  {
+    // Promise in entry callback already satisfied, no action needed
+  }
+
+  // create promise and future to be forwarded
+  promise_res = std::make_shared<std::promise<Response>>();
+  std::shared_future<Response> future_res(promise_res->get_future());
+
+  if(async_execution_)
+  {
+    // run in qt thread and return detached Response
+    QtConcurrent::run(tpool_, [this, arg]() { return cb_(arg); });
+    Response res = true;
+    promise_res->set_value(res);
+  }
+  else
+  {
+    // run in qt thread and bind Response to future that gets forwarded to client code
+    qfuture = new QFuture<Response>(QtConcurrent::run(tpool_, [this, arg]() { return cb_(arg); }));;
+    connect(fut_watcher_, &QFutureWatcher<Response>::finished,[this](){
+      promise_res->set_value(fut_watcher_->result());
+    });
+    fut_watcher_->setFuture(*qfuture);
+  }
+
+  return future_res;
+}
+
 StateMachine::StateMachine(double event_loop_period, log4cxx::LoggerPtr logger)
   : sm_(nullptr)
   , sm_info_(nullptr)
   , event_loop_period_(event_loop_period)
   , async_thread_pool_(new QThreadPool(this))
-  , async_processing_pool_(new QThreadPool(this))
   , logger_(logger ? logger : DEFAULT_LOGGER)
 {
 }
@@ -285,20 +327,10 @@ bool StateMachine::stop()
 
 std::shared_future<Response> StateMachine::execute(const Action& action, bool force)
 {
-/*  std::packaged_task<Response (Action)> exec_task([this](Action action){
-    return executeAction(action);
-  });*/
-  //std::shared_future<Response> res_fut(exec_task.get_future());
-  //std::shared_future<Response> res_fut;
 
   if (force)
   {
     LOG4CXX_WARN(logger_, "Forcing action " << action.id);
-    // running asynchronously
-    //std::thread(std::move(exec_task), action).detach();
-/*
-    res_fut = std::shared_future<Response>(std::async(std::launch::async, [this, action]()-> Response {
-      return executeAction(action); }));*/
     return executeAction(action);
   }
 
@@ -312,11 +344,6 @@ std::shared_future<Response> StateMachine::execute(const Action& action, bool fo
     LOG4CXX_DEBUG(logger_, res.msg);
     return res_fut;
   }
-
-  // running asynchronously
-  //std::thread(std::move(exec_task), action).detach();
-/*  res_fut = std::shared_future<Response>(std::async(std::launch::async, [this, action]()-> Response {
-    return executeAction(action); }));*/
   return executeAction(action);
 }
 
@@ -363,10 +390,10 @@ void StateMachine::processQueuedActions()
     return;
   }
 
-/*  if (emitStateEnteredSignal())
+  if (emitStateEnteredSignal())
   {
     return;  // allow for listeners to handle signal
-  }*/
+  }
 
   Action action;
   {
@@ -380,10 +407,6 @@ void StateMachine::processQueuedActions()
     action_queue_.pop_front();
   }
   std::shared_future<Response> res_fut = executeAction(action);
-  //std::thread(&StateMachine::executeAction, this, action).detach();
-/*  QFuture<Response> future = QtConcurrent::run(async_processing_pool_,
-                                               [this, action]() {
-    return executeAction(action); });*/
   return;
 }
 
@@ -468,33 +491,27 @@ std::shared_future<Response> StateMachine::executeAction(const Action& action)
   std::promise<Action> action_promise;
   action_future_ = std::shared_future<Action>(action_promise.get_future());
   action_promise.set_value(action);
-  response_transition_ = std::promise<ResponseFuturesMap>();
-  std::shared_future<ResponseFuturesMap> response_future = std::shared_future<ResponseFuturesMap>(
-      response_transition_.get_future());
+  responses_map_promise_ = std::promise<ResponseFuturesMap>();
+  std::shared_future<ResponseFuturesMap> responses_map_future = std::shared_future<ResponseFuturesMap>(
+      responses_map_promise_.get_future());
 
   // submitting event, entry callbacks registered in signalSetup() should be invoked
-  std::chrono::steady_clock::time_point start =  std::chrono::steady_clock::now();
   LOG4CXX_DEBUG(logger_, "Submitting event with id: " << action.id);
   sm_->submitEvent(QString::fromStdString(action.id));
-  std::chrono::steady_clock::time_point end =  std::chrono::steady_clock::now();
-  LOG4CXX_DEBUG(logger_, "Done submitting event, took  " <<
-                std::chrono::duration_cast<std::chrono::seconds>(end - start).count() <<" seconds");
 
   // wait until transition is complete
   QTime stop_time = QTime::currentTime().addMSecs(WAIT_TRANSITION_PERIOD);
   bool transition_made = false;
   QVector<QScxmlStateMachineInfo::StateId> current_st_ids;
   while (QTime::currentTime() < stop_time && !transition_made)
-  //while (!transition_made)
   {
     QCoreApplication::processEvents(QEventLoop::AllEvents, WAIT_QT_EVENTS);
-    //LOG4CXX_DEBUG(logger_, "Waiting on future to make transition ");
-    transition_made = response_future.wait_for(std::chrono::milliseconds(WAIT_QT_EVENTS)) == std::future_status::ready;
+    transition_made = responses_map_future.wait_for(std::chrono::milliseconds(WAIT_QT_EVENTS)) == std::future_status::ready;
   }
 
   // resetting synchronization variables
-  //action_future_ = std::shared_future<Action>();
-  response_transition_ = std::promise<ResponseFuturesMap>();
+  responses_map_promise_ = std::promise<ResponseFuturesMap>();
+  action_future_ = std::shared_future<Action>();
   if (!transition_made)
   {
     QVector<QScxmlStateMachineInfo::StateId> current_st_ids = sm_info_->configuration();
@@ -520,21 +537,13 @@ std::shared_future<Response> StateMachine::executeAction(const Action& action)
   }
 
   // retrieve response now
-  ResponseFuturesMap futures_map = response_future.get();
+  ResponseFuturesMap futures_map = responses_map_future.get();
   for(auto& kv : futures_map)
   {
     int state_id = kv.first;
     std::shared_future<Response>& future = kv.second;
-/*    while (!future.isFinished())
-    {
-      QCoreApplication::processEvents(QEventLoop::AllEvents, WAIT_QT_EVENTS);
-    }*/
-
     if(sm_private_->m_stateTable->state(state_id).isAtomic())
     {
-/*      res_fut = std::async(std::launch::async, [future](){
-        return future.result();
-      });*/
       res_fut = future;
     }
     const std::string& st_name = sm_info_->stateName(state_id).toStdString();
@@ -565,14 +574,14 @@ void StateMachine::signalSetup()
       entered_states_queue_.push_back(id);  // will emit entered signals from the processing thread
     }
 
+    // attempting to get the action if one has been binded to the action_future in the executeAction method
     Action action;
     if(action_future_.valid())
     {
       action  = action_future_.get();
     }
 
-
-    bool atomic_found = false;
+    // now storing all futures returned by the state entry callbacks
     ResponseFuturesMap futures_map;
     for (int id : states)
     {
@@ -583,22 +592,9 @@ void StateMachine::signalSetup()
         temp_res_future = (*entry_callbacks_.at(st_name))(action);
         futures_map.insert(std::make_pair(id, temp_res_future));
       }
-/*      else
-      {
-        continue;
-      }*/
-
-/*
-      if (!atomic_found)
-      {
-        res = temp_res;
-      }
-*/
-
-      //atomic_found = sm_private_->m_stateTable->state(id).isAtomic();
     }
-    //LOG4CXX_DEBUG(logger_, "State transitions completed");
-    response_transition_.set_value(futures_map);
+
+    responses_map_promise_.set_value(futures_map);
     LOG4CXX_DEBUG(logger_, "All entered states processed");
   });
 
