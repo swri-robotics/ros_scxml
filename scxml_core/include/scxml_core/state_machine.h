@@ -132,8 +132,8 @@ private:
     EntryCallback cb_;
     QThreadPool* tpool_;
     QFutureWatcher<Response>* fut_watcher_ = new QFutureWatcher<Response>();
-    QFuture<Response>* qfuture = nullptr;
-    std::shared_ptr<std::promise<Response>> promise_res = std::make_shared<std::promise<Response>>();
+    QFuture<Response>* qfuture_ = nullptr;
+    std::shared_ptr<std::promise<Response>> promise_res_ = std::make_shared<std::promise<Response>>();
   };
   typedef std::shared_ptr<EntryCbHandler> EntryCbHandlerPtr;
 
@@ -250,10 +250,10 @@ protected:
 
   std::shared_future<Action> action_future_;
   using ResponseFuturesMap = std::map<int, std::shared_future<Response>>;
-  std::promise< ResponseFuturesMap > responses_map_promise_;
+  std::promise<ResponseFuturesMap> responses_map_promise_;
   std::map<std::string, PreconditionCallback> precond_callbacks_;
   std::map<std::string, EntryCbHandlerPtr> entry_callbacks_;
-  std::map<std::string, std::function<void()> > exit_callbacks_;
+  std::map<std::string, std::function<void()>> exit_callbacks_;
   QThreadPool* async_thread_pool_;
   mutable std::mutex entered_states_mutex_;
   std::deque<QScxmlStateMachineInfo::StateId> entered_states_queue_;
