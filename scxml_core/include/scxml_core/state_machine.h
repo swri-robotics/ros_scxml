@@ -40,6 +40,7 @@
 #include <mutex>
 #include <memory>
 #include <deque>
+#include <future>
 #include <QScxmlStateMachine>
 #include <private/qscxmlstatemachineinfo_p.h>
 #include <private/qscxmlstatemachine_p.h>
@@ -113,30 +114,23 @@ private:
   class EntryCbHandler
   {
   public:
-    EntryCbHandler(QThreadPool* thread_pool, EntryCallback cb, bool async_execution = false)
-      : cb_(cb), async_execution_(async_execution), tpool_(thread_pool)
+    EntryCbHandler(QThreadPool* thread_pool, EntryCallback cb, bool discard_response = false)
+      : cb_(cb), discard_response_(discard_response), tpool_(thread_pool)
     {
     }
 
-    Response operator()(const Action& arg)
-    {
-      Response res;
-      if (async_execution_)
-      {
-        QFuture<Response> future = QtConcurrent::run(tpool_, [this, arg]() { return cb_(arg); });
-        res = true;
-      }
-      else
-      {
-        res = cb_(arg);
-      }
-      return std::move(res);
-    }
+    /**
+     * @brief invokes the state entry callback
+     * @param arg The action
+     * @return a future binded to the Response returned by the entry callback
+     */
+    std::shared_future<Response> operator()(const Action& arg);
 
   private:
-    bool async_execution_;
+    bool discard_response_;
     EntryCallback cb_;
     QThreadPool* tpool_;
+    std::shared_ptr<std::promise<Response>> promise_res_ = std::make_shared<std::promise<Response>>();
   };
   typedef std::shared_ptr<EntryCbHandler> EntryCbHandlerPtr;
 
@@ -159,7 +153,7 @@ public:
    *              for critical tasks only.
    * @return  A response object
    */
-  Response execute(const Action& action, bool force = false);
+  std::shared_future<Response> execute(const Action& action, bool force = false);
 
   /**
    * @brief Adds the action to the queue
@@ -172,19 +166,20 @@ public:
    * When the callback returns a valid result then the transition proceeds, otherwise the transition is
    * negated.
    * @param st_name The name of the state
-   * @param cb      The callback to be invoked; it must be a non-blocking function.
+   * @param cb      The callback to be invoked; long running blocking functions are not recommended.
    * @return  True on success, false otherwise
    */
   bool addPreconditionCallback(const std::string& st_name, PreconditionCallback cb);
 
   /**
-   * @brief adds a callback that gets invoked when a state is entered
-   * @param st_name         The name of the state
-   * @param cb              The callback to be invoked; it can be a blocking function.
-   * @param async_execution Set to true for long running blocking tasks; the callback will be executed asynchronously
+   * @brief adds a callback that gets invoked asynchronously when a state is entered
+   * @param st_name           The name of the state
+   * @param cb                The callback to be invoked; it can be a blocking function.
+   * @param discard_response  When true the callback will be executed asynchronously however the Response returned by
+   * the callback won't be forwarded by the < b>execute()< /b> method back to the client code.
    * @return  True on success, false otherwise
    */
-  bool addEntryCallback(const std::string& st_name, EntryCallback cb, bool async_execution = true);
+  bool addEntryCallback(const std::string& st_name, EntryCallback cb, bool discard_response = false);
 
   /**
    * @brief adds a callback that gets invoked when a state is exited
@@ -226,7 +221,7 @@ signals:
 protected:
   void signalSetup();
   bool emitStateEnteredSignal();
-  Response executeAction(const Action& action);
+  std::shared_future<Response> executeAction(const Action& action);
   void processQueuedActions();
   std::vector<int> getTransitionsIDs(const QVector<int>& states) const;
   std::vector<int> getValidTransitionIDs() const;
@@ -245,15 +240,16 @@ protected:
   double event_loop_period_;
   QTimer* execute_action_timer_;
   mutable std::mutex consuming_action_mutex_;
-  ;
+
   std::atomic<bool> busy_executing_action_;
   std::atomic<bool> busy_consuming_entry_cb_;
 
   std::shared_future<Action> action_future_;
-  std::promise<Response> response_promise_;
+  using ResponseFuturesMap = std::map<int, std::shared_future<Response>>;
+  std::promise<ResponseFuturesMap> responses_map_promise_;
   std::map<std::string, PreconditionCallback> precond_callbacks_;
   std::map<std::string, EntryCbHandlerPtr> entry_callbacks_;
-  std::map<std::string, std::function<void()> > exit_callbacks_;
+  std::map<std::string, std::function<void()>> exit_callbacks_;
   QThreadPool* async_thread_pool_;
   mutable std::mutex entered_states_mutex_;
   std::deque<QScxmlStateMachineInfo::StateId> entered_states_queue_;
