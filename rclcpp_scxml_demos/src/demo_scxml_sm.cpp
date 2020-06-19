@@ -63,6 +63,7 @@ public:
     // prompts the sm to execute an action.
     execute_state_subs_ = node_->create_subscription<std_msgs::msg::String>(
         EXECUTE_ACTION_TOPIC, 1, [this](const std_msgs::msg::String::SharedPtr msg) {
+          std::cout<< "\n>>>>>>>>>>>> Got new action message <<<<<<<<<<<<<" << std::endl;
           if (sm_->isBusy())
           {
             RCLCPP_ERROR(node_->get_logger(), "State Machine is busy");
@@ -70,7 +71,14 @@ public:
           }
 
           rclcpp::Clock ros_clock;
-          Response res = sm_->execute(Action{ .id = msg->data, .data = ros_clock.now() });
+          std::shared_future<Response> res_fut = sm_->execute(Action{ .id = msg->data, .data = ros_clock.now() });
+          if(res_fut.wait_for(std::chrono::seconds(5)) != std::future_status::ready)
+          {
+            RCLCPP_INFO(node_->get_logger(), "Took too long to get response");
+            return;
+          }
+
+          Response res = res_fut.get();
           if (!res)
           {
             return;
@@ -268,10 +276,12 @@ int main(int argc, char** argv)
             }
 
             process_app.resetProcess();
-            rclcpp::sleep_for(std::chrono::milliseconds(3000));
+            std::this_thread::sleep_for(std::chrono::milliseconds(3000));
+
             // queuing action, should exit the state
             sm->postAction(Action{ .id = "trIdle" });
-            return true;
+            RCLCPP_INFO(node->get_logger(), "Posted trIdle action");
+            return Response(true,22.0);
           },
           false);  // false = runs sequentially, use for non-blocking functions
     },

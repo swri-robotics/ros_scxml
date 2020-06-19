@@ -38,7 +38,7 @@
 #include <QString>
 #include <QTime>
 #include <QEventLoop>
-#include <chrono>
+#include <iostream>
 #include <boost/format.hpp>
 #include <log4cxx/basicconfigurator.h>
 #include <log4cxx/patternlayout.h>
@@ -187,23 +187,19 @@ TransitionTable buildTransitionTable(const QScxmlStateMachineInfo* sm_info)
 
 std::shared_future<Response> StateMachine::EntryCbHandler::operator()(const Action& arg)
 {
-  // clean up previous operation
-  fut_watcher_->disconnect();
-  if (qfuture_)
-  {
-    delete qfuture_;
-    qfuture_ = nullptr;
-  }
-
   // forward failed Response to any futures that may be waiting
-  try
-  {
-    promise_res_->set_value(Response(false));
-  }
-  catch (std::future_error& e)
-  {
-    // Promise in entry callback already satisfied, no action needed
-  }
+  QFuture<void> qfuture = QtConcurrent::run(tpool_, [this]() {
+    try
+    {
+      promise_res_->set_value(Response(false));
+    }
+    catch (std::future_error& e)
+    {
+      // Promise in entry callback already satisfied, no action needed
+    }
+  });
+  qfuture.waitForFinished();
+
 
   // create promise and future to be forwarded
   promise_res_ = std::make_shared<std::promise<Response>>();
@@ -211,7 +207,7 @@ std::shared_future<Response> StateMachine::EntryCbHandler::operator()(const Acti
 
   if (async_execution_)
   {
-    // run in qt thread and return detached Response
+    // run in qt thread and return unbinded Response
     QtConcurrent::run(tpool_, [this, arg]() { return cb_(arg); });
     Response res = true;
     promise_res_->set_value(res);
@@ -219,12 +215,9 @@ std::shared_future<Response> StateMachine::EntryCbHandler::operator()(const Acti
   else
   {
     // run in qt thread and bind Response to future that gets forwarded to client code
-    qfuture_ = new QFuture<Response>(QtConcurrent::run(tpool_, [this, arg]() { return cb_(arg); }));
-    ;
-    connect(fut_watcher_, &QFutureWatcher<Response>::finished, [this]() {
-      promise_res_->set_value(fut_watcher_->result());
+    QtConcurrent::run(tpool_, [this, arg]() {
+      promise_res_->set_value( cb_(arg));
     });
-    fut_watcher_->setFuture(*qfuture_);
   }
 
   return future_res;

@@ -45,7 +45,6 @@
 #include <private/qscxmlstatemachineinfo_p.h>
 #include <private/qscxmlstatemachine_p.h>
 #include <QTimer>
-#include <QFutureWatcher>
 #include <QThread>
 #include <QThreadPool>
 #include <QtConcurrent/QtConcurrent>
@@ -131,8 +130,6 @@ private:
     bool async_execution_;
     EntryCallback cb_;
     QThreadPool* tpool_;
-    QFutureWatcher<Response>* fut_watcher_ = new QFutureWatcher<Response>();
-    QFuture<Response>* qfuture_ = nullptr;
     std::shared_ptr<std::promise<Response>> promise_res_ = std::make_shared<std::promise<Response>>();
   };
   typedef std::shared_ptr<EntryCbHandler> EntryCbHandlerPtr;
