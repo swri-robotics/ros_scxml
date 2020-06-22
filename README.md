@@ -20,11 +20,13 @@ The QScxml library is only available from version Qt 5.7 and higher. This implem
     sudo add-apt-repository ppa:beineri/opt-qt-5.13.2-bionic
     sudo apt-get update
     ```
-    > Note: Edit command below to match the version of qt that you'd like to install
+    > Note: Edit command above to match the version of qt that you'd like to install
 - Install the full Qt library 
     ```
     sudo apt install qt513-meta-full
     ```
+    > Note: Edit command above to match the version of qt that you'd like to install
+
 #### Alternative Download (Qt Installer)
 - The library can be downloaded from [here](http://download.qt.io/official_releases/qt/).  Run the installation script with root access and follow the on screen instructions.
   
@@ -211,7 +213,7 @@ export LD_LIBRARY_PATH=<path>/<to>/<qt>/plugins:$LD_LIBRARY_PATH
     This means that the actions available at the current state are **trAborted** and **userClear**
 7. Publish an action from the list to the state machine, for instance the **userClear** action will be requested as follows:
     ```
-    rostopic pub -1 /execute_state std_msgs/String "data: 'userClear'"
+    rostopic pub -1 /execute_action std_msgs/String "data: 'userClear'"
     ```
 
     This should cause the state machine to go into the **st2Clearing** state.  A few seconds after that it should go into the **st2Stopped** state as the custom entry callback function automatically posts an action.
