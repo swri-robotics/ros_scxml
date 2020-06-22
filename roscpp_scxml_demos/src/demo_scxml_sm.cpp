@@ -74,8 +74,21 @@ public:
             return;
           }
 
-          std::shared_future<Response> res_fut =
-              sm_->execute(Action{ .id = msg->data, .data = ros::Time::now().toSec() });
+          TransitionResult result = sm_->execute(Action{ .id = msg->data, .data = ros::Time::now().toSec() });
+          if(!result)
+          {
+            ROS_INFO_STREAM(result.getErrorMessage());
+            return;
+          }
+          ROS_INFO("Action %s successfully executed, Transition succeeded", msg->data.c_str());
+
+          // check if response futures are available
+          if(!result.hasPendingResponse())
+          {
+            return;
+          }
+
+          ResponseFuture res_fut = result.getResponse();
           if (res_fut.wait_for(std::chrono::seconds(5)) != std::future_status::ready)
           {
             ROS_INFO("Took too long to get response");
@@ -87,8 +100,6 @@ public:
           {
             return;
           }
-
-          ROS_INFO("Action %s successfully executed", msg->data.c_str());
 
           // checking for returned data
           if (!res.data.empty())
