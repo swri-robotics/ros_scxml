@@ -185,39 +185,58 @@ TransitionTable buildTransitionTable(const QScxmlStateMachineInfo* sm_info)
   return std::move(table);
 }
 
+ResponseFuture::ResponseFuture(const std::shared_future<Response>& res_fut,bool is_detached,
+                               const std::string& state_name, bool is_atomic):
+    std::shared_future<Response>(res_fut),
+    is_detached_(is_detached),
+    state_name_(state_name),
+    is_atomic_(is_atomic)
+{
+
+}
+
+TransitionResult::TransitionResult(bool succeeded, const std::vector<ResponseFuture>& responses,
+                                   const std::string err_msg):
+    succeeded_(succeeded),
+    responses_(responses),
+    err_msg_(err_msg)
+{
+
+}
+
+const ResponseFuture& TransitionResult::getResponse() const
+{
+  if(responses_.empty())
+  {
+    throw(std::runtime_error("Response unavailable, no entry callback was found for any of the active states"));
+  }
+  return responses_.front();
+}
+
+const bool TransitionResult::hasPendingResponse() const
+{
+  return !responses_.empty() && !responses_.front().isDetached();
+}
+
 std::shared_future<Response> StateMachine::EntryCbHandler::operator()(const Action& arg)
 {
-  // forward failed Response to any futures that may be waiting
-  QFuture<void> qfuture = QtConcurrent::run(tpool_, [this]() {
-    try
-    {
-      promise_res_->set_value(Response(false));
-    }
-    catch (std::future_error& e)
-    {
-      // Promise in entry callback already satisfied, no action needed
-    }
-  });
-  qfuture.waitForFinished();
-
   // create promise and future to be forwarded
-  promise_res_ = std::make_shared<std::promise<Response>>();
-  std::shared_future<Response> future_res(promise_res_->get_future());
+  std::shared_ptr<std::promise<Response>> promise_res = std::make_shared<std::promise<Response>>();
+  std::shared_future<Response> future_res(promise_res->get_future());
 
   if (discard_response_)
   {
     // run in qt thread and return unbinded Response future
     QtConcurrent::run(tpool_, [this, arg]() { return cb_(arg); });
     Response res = true;
-    promise_res_->set_value(res);
+    promise_res->set_value(res);
   }
   else
   {
-    // run in qt thread and bind Response to future that gets forwarded to client code
-    QtConcurrent::run(tpool_, [this, arg]() {
+    QtConcurrent::run(tpool_,[this, arg, promise_res](){
       try
       {
-        promise_res_->set_value(cb_(arg));
+        promise_res->set_value(cb_(arg));
       }
       catch (std::future_error& e)
       {
@@ -225,7 +244,6 @@ std::shared_future<Response> StateMachine::EntryCbHandler::operator()(const Acti
       }
     });
   }
-
   return future_res;
 }
 
@@ -325,7 +343,7 @@ bool StateMachine::stop()
   return true;
 }
 
-std::shared_future<Response> StateMachine::execute(const Action& action, bool force)
+TransitionResult StateMachine::execute(const Action& action, bool force)
 {
   if (force)
   {
@@ -335,13 +353,9 @@ std::shared_future<Response> StateMachine::execute(const Action& action, bool fo
 
   if (busy_executing_action_ || busy_consuming_entry_cb_)
   {
-    std::promise<Response> res_promise;
-    std::shared_future<Response> res_fut = std::shared_future<Response>(res_promise.get_future());
-
-    Response res = Response(false, boost::any(), "SM is busy");
-    res_promise.set_value(res);
-    LOG4CXX_DEBUG(logger_, res.msg);
-    return res_fut;
+    std::string err_msg = "SM is busy";
+    LOG4CXX_DEBUG(logger_, err_msg);
+    return TransitionResult(false, {}, err_msg);
   }
   return executeAction(action);
 }
@@ -405,21 +419,16 @@ void StateMachine::processQueuedActions()
     action = action_queue_.front();
     action_queue_.pop_front();
   }
-  std::shared_future<Response> res_fut = executeAction(action);
+  TransitionResult res = executeAction(action);
   return;
 }
 
-std::shared_future<Response> StateMachine::executeAction(const Action& action)
+TransitionResult StateMachine::executeAction(const Action& action)
 {
   std::lock_guard<std::mutex> lock(consuming_action_mutex_);
 
   ScopeExit scope_exit(&this->busy_executing_action_);  // sets the flag to busy
 
-  Response res;
-  std::promise<Response> res_promise;
-  std::shared_future<Response> res_fut(res_promise.get_future());
-
-  // get transitions and check their events
   std::vector<int> transition_ids = getValidTransitionIDs();
 
   // filter transitions in order to keep those caused by the requested action
@@ -436,12 +445,12 @@ std::shared_future<Response> StateMachine::executeAction(const Action& action)
   // check if valid transitions remain
   if (transition_ids.empty())
   {
-    res.msg = boost::str(boost::format("Action '%s' is not valid for any of the active states") % action.id);
-    res.success = false;
-    LOG4CXX_ERROR(logger_, res.msg);
+    std::string err_msg = boost::str(boost::format("Action '%s' is not valid for any of the active states") % action.id);
+    //res.success = false;
+    LOG4CXX_ERROR(logger_, err_msg);
 
-    res_promise.set_value(res);
-    return res_fut;
+    //res_promise.set_value(res);
+    return TransitionResult(false,{},err_msg);
   }
 
   int current_src_st_id = sm_info_->transitionSource(transition_ids.front());
@@ -459,31 +468,30 @@ std::shared_future<Response> StateMachine::executeAction(const Action& action)
 
   if (target_state_ids.empty())
   {
-    res.msg = boost::str(boost::format("No valid target states were found for transition %1% -> %2%") %
+    std::string err_msg = boost::str(boost::format("No valid target states were found for transition %1% -> %2%") %
                          current_src_st_name % action.id);
-    res.success = false;
-    res_promise.set_value(res);
-    return res_fut;
+    return TransitionResult(false,{},err_msg);
   }
 
   // checking precondition
+  Response precond_res;
   if (!std::all_of(target_state_ids.begin(), target_state_ids.end(), [&](const int& st_id) -> bool {
         std::string st = sm_info_->stateName(st_id).toStdString();
         if (precond_callbacks_.count(st) == 0)
         {
           return true;  // no precondition
         }
-        res = precond_callbacks_[st](action);
-        if (!res)
+        precond_res = precond_callbacks_[st](action);
+        if (!precond_res)
         {
-          res.msg = boost::str(boost::format("Precondition for state %s failed: %s") % st % res.msg);
+          precond_res.msg = boost::str(boost::format("Precondition for state %s failed: %s") % st % precond_res.msg);
         }
-        return res;
+        return TransitionResult(precond_res.success,{},precond_res.msg);
       }))
   {
-    LOG4CXX_ERROR(logger_, res.msg);
-    res_promise.set_value(res);  // precondition failed, not proceeding with transition
-    return res_fut;
+    // precondition failed, not proceeding with transition
+    LOG4CXX_ERROR(logger_, precond_res.msg);
+    return TransitionResult(false,{},precond_res.msg);
   }
 
   // setting up synchronization variables*
@@ -528,36 +536,39 @@ std::shared_future<Response> StateMachine::executeAction(const Action& action)
                         sm_info_->stateName(target_state_ids.front()).toStdString(),
                         [&](std::string r, const int& s) { return r + ", " + sm_info_->stateName(s).toStdString(); });
 
-    res.msg = "SM timed out before finishing transition to states [" + target_states_str + "]";
-    res.success = false;
-    LOG4CXX_ERROR(logger_, res.msg);
+    std::string err_msg = "SM timed out before finishing transition to states [" + target_states_str + "]";
+    LOG4CXX_ERROR(logger_, err_msg);
     LOG4CXX_ERROR(logger_, "Current states are: " << current_states_str.c_str());
-    res_promise.set_value(res);
-    return res_fut;
+    return TransitionResult(false,{},err_msg);;
   }
 
-  // retrieve response now
+  // retrieve responses now
   ResponseFuturesMap futures_map = responses_map_future.get();
+  std::vector<ResponseFuture> responses_vec;
   for (auto& kv : futures_map)
   {
     int state_id = kv.first;
     std::shared_future<Response>& future = kv.second;
+    const std::string& st_name = sm_info_->stateName(state_id).toStdString();
+    bool is_detached = entry_callbacks_.at(st_name)->discard_response_;
     if (sm_private_->m_stateTable->state(state_id).isAtomic())
     {
-      res_fut = future;
+      responses_vec.insert(responses_vec.begin(), ResponseFuture(future,is_detached,st_name,true));
     }
-    const std::string& st_name = sm_info_->stateName(state_id).toStdString();
+    else
+    {
+      responses_vec.push_back(ResponseFuture(future,is_detached,st_name,false));
+    }
     LOG4CXX_DEBUG(logger_, "Finished executing entry callback for state " << st_name);
   }
 
   if (futures_map.empty())
   {
-    res.success = true;
-    res_promise.set_value(res);
+    return TransitionResult(true,{});
   }
 
   LOG4CXX_DEBUG(logger_, "Retrieved response structure from future");
-  return res_fut;
+  return TransitionResult(true,responses_vec);
 }
 
 void StateMachine::signalSetup()

@@ -72,7 +72,8 @@ struct Response
   /**
    * @brief Constructor for the response object
    * @param success   Set to true if the requested action was completed, use false otherwise.
-   * @param data          Optional data that was generated from the requested transaction.
+   * @param data      Optional data that was generated from the requested transaction.
+   * @param msg       Optional error message
    */
   Response(bool success = true, boost::any data = boost::any(), std::string msg = "")
     : success(success), data(data), msg(msg)
@@ -104,6 +105,109 @@ struct Response
   std::string msg;
 };
 
+class StateMachine;
+
+/**
+ * @class state_machine::ResponseFuture
+ * @brief A shared future with additional information regarding the Response object
+ *        return by entry callbacks associated with states
+ */
+class ResponseFuture: public std::shared_future<Response>
+{
+public:
+
+  /**
+   * True if the future is not linked to the response produced by the state's entry callback
+   * @return a boolean
+   */
+  bool isDetached() const
+  {
+    return is_detached_;
+  }
+
+  /**
+   * @brief the name of the state that generated the response by invoking its entry callback
+   * @return a string
+   */
+  std::string getState() const
+  {
+    return state_name_;
+  }
+
+  /**
+   * @brief true if the state that produced the response is atomic
+   * @return a boolean
+   */
+  bool isAtomic() const
+  {
+    return is_atomic_;
+  }
+
+  ~ResponseFuture(){}
+
+private:
+  friend class StateMachine;
+
+  ResponseFuture(const std::shared_future<Response>& res_fut,bool is_detached, const std::string& state_name, bool is_atomic);
+
+  bool is_detached_;
+  bool is_atomic_;
+  std::string state_name_;
+
+};
+
+/**
+ * @class state_machine::TransitionResult
+ * @brief encapsulates the details of the state machine transition
+ */
+class TransitionResult
+{
+public:
+
+  /**
+   * @brief Evaluates to true when the transition succeeded, false otherwise
+   */
+  operator bool() const { return succeeded_; }
+
+  /**
+   * @brief A vector of responses produced by the entry callbacks associated with the states that were
+   *        made active by this transition.  The front element corresponds to the atomic state's response
+   * @return a vector of ResponseFutures
+   */
+  const std::vector<ResponseFuture>& getResponses() const {return responses_;}
+
+  /**
+   * @brief Returns the response produced by the callback associated with the atomic state
+   *        made active by this transition.  Throws an exception when no response is available.
+   * @return A reference to a response future
+   */
+  const ResponseFuture& getResponse() const;
+
+  /**
+   * @brief evaluates to true if there's a response waiting to be returned by the entry callback associated with
+   *        the now active atomic state.  When true it should be safe to call the wait_for() and get() methods
+   *        on the ResponseFuture
+   * @return  a boolean
+   */
+  const bool hasPendingResponse() const;
+
+  /**
+   * @brief the error message providing a brief description of the error that prevented the transition.
+   * @return a string
+   */
+  const std::string getErrorMessage() const {return err_msg_;}
+
+private:
+  friend class StateMachine;
+
+  TransitionResult(bool succeeded, const std::vector<ResponseFuture>& responses, const std::string err_msg ="");
+
+  bool succeeded_;
+  std::vector<ResponseFuture> responses_;
+  std::string err_msg_;
+
+};
+
 class StateMachine : public QObject
 {
 public:
@@ -126,11 +230,9 @@ private:
      */
     std::shared_future<Response> operator()(const Action& arg);
 
-  private:
     bool discard_response_;
     EntryCallback cb_;
     QThreadPool* tpool_;
-    std::shared_ptr<std::promise<Response>> promise_res_ = std::make_shared<std::promise<Response>>();
   };
   typedef std::shared_ptr<EntryCbHandler> EntryCbHandlerPtr;
 
@@ -151,9 +253,9 @@ public:
    * @param action The action object
    * @param force Ignores the action queue and forces the execution of the requested action, recommended
    *              for critical tasks only.
-   * @return  A response object
+   * @return  A transition result object
    */
-  std::shared_future<Response> execute(const Action& action, bool force = false);
+  TransitionResult execute(const Action& action, bool force = false);
 
   /**
    * @brief Adds the action to the queue
@@ -221,7 +323,7 @@ signals:
 protected:
   void signalSetup();
   bool emitStateEnteredSignal();
-  std::shared_future<Response> executeAction(const Action& action);
+  TransitionResult executeAction(const Action& action);
   void processQueuedActions();
   std::vector<int> getTransitionsIDs(const QVector<int>& states) const;
   std::vector<int> getValidTransitionIDs() const;
