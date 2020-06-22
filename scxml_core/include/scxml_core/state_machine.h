@@ -112,48 +112,40 @@ class StateMachine;
  * @brief A shared future with additional information regarding the Response object
  *        return by entry callbacks associated with states
  */
-class ResponseFuture: public std::shared_future<Response>
+class ResponseFuture : public std::shared_future<Response>
 {
 public:
-
   /**
    * True if the future is not linked to the response produced by the state's entry callback
    * @return a boolean
    */
-  bool isDetached() const
-  {
-    return is_detached_;
-  }
+  bool isDetached() const { return is_detached_; }
 
   /**
    * @brief the name of the state that generated the response by invoking its entry callback
    * @return a string
    */
-  std::string getState() const
-  {
-    return state_name_;
-  }
+  std::string getState() const { return state_name_; }
 
   /**
    * @brief true if the state that produced the response is atomic
    * @return a boolean
    */
-  bool isAtomic() const
-  {
-    return is_atomic_;
-  }
+  bool isAtomic() const { return is_atomic_; }
 
-  ~ResponseFuture(){}
+  ~ResponseFuture() {}
 
 private:
   friend class StateMachine;
 
-  ResponseFuture(const std::shared_future<Response>& res_fut,bool is_detached, const std::string& state_name, bool is_atomic);
+  ResponseFuture(const std::shared_future<Response>& res_fut,
+                 bool is_detached,
+                 const std::string& state_name,
+                 bool is_atomic);
 
   bool is_detached_;
   bool is_atomic_;
   std::string state_name_;
-
 };
 
 /**
@@ -163,7 +155,6 @@ private:
 class TransitionResult
 {
 public:
-
   /**
    * @brief Evaluates to true when the transition succeeded, false otherwise
    */
@@ -174,7 +165,7 @@ public:
    *        made active by this transition.  The front element corresponds to the atomic state's response
    * @return a vector of ResponseFutures
    */
-  const std::vector<ResponseFuture>& getResponses() const {return responses_;}
+  const std::vector<ResponseFuture>& getResponses() const { return responses_; }
 
   /**
    * @brief Returns the response produced by the callback associated with the atomic state
@@ -195,17 +186,16 @@ public:
    * @brief the error message providing a brief description of the error that prevented the transition.
    * @return a string
    */
-  const std::string getErrorMessage() const {return err_msg_;}
+  const std::string getErrorMessage() const { return err_msg_; }
 
 private:
   friend class StateMachine;
 
-  TransitionResult(bool succeeded, const std::vector<ResponseFuture>& responses, const std::string err_msg ="");
+  TransitionResult(bool succeeded, const std::vector<ResponseFuture>& responses, const std::string err_msg = "");
 
   bool succeeded_;
   std::vector<ResponseFuture> responses_;
   std::string err_msg_;
-
 };
 
 class StateMachine : public QObject

@@ -75,7 +75,7 @@ public:
           }
 
           TransitionResult result = sm_->execute(Action{ .id = msg->data, .data = ros::Time::now().toSec() });
-          if(!result)
+          if (!result)
           {
             ROS_INFO_STREAM(result.getErrorMessage());
             return;
@@ -83,7 +83,7 @@ public:
           ROS_INFO("Action %s successfully executed, Transition succeeded", msg->data.c_str());
 
           // check if response futures are available
-          if(!result.hasPendingResponse())
+          if (!result.hasPendingResponse())
           {
             return;
           }

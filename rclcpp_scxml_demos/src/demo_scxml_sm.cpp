@@ -72,7 +72,7 @@ public:
 
           rclcpp::Clock ros_clock;
           TransitionResult result = sm_->execute(Action{ .id = msg->data, .data = ros_clock.now().seconds() });
-          if(!result)
+          if (!result)
           {
             RCLCPP_INFO(node_->get_logger(), result.getErrorMessage());
             return;
@@ -81,14 +81,14 @@ public:
           RCLCPP_INFO(node_->get_logger(), "Action %s successfully executed, Transition succeeded", msg->data.c_str());
 
           // check if response futures are available
-          if(!result.hasPendingResponse())
+          if (!result.hasPendingResponse())
           {
             return;
           }
 
           ResponseFuture res_fut = result.getResponse();
-          RCLCPP_INFO(node_->get_logger(), "Waiting for states's \"%s\" callback response now",
-                      res_fut.getState().c_str() );
+          RCLCPP_INFO(
+              node_->get_logger(), "Waiting for states's \"%s\" callback response now", res_fut.getState().c_str());
           if (res_fut.wait_for(std::chrono::seconds(5)) != std::future_status::ready)
           {
             RCLCPP_INFO(node_->get_logger(), "Took too long to get response");

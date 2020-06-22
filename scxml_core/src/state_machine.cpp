@@ -185,28 +185,24 @@ TransitionTable buildTransitionTable(const QScxmlStateMachineInfo* sm_info)
   return std::move(table);
 }
 
-ResponseFuture::ResponseFuture(const std::shared_future<Response>& res_fut,bool is_detached,
-                               const std::string& state_name, bool is_atomic):
-    std::shared_future<Response>(res_fut),
-    is_detached_(is_detached),
-    state_name_(state_name),
-    is_atomic_(is_atomic)
+ResponseFuture::ResponseFuture(const std::shared_future<Response>& res_fut,
+                               bool is_detached,
+                               const std::string& state_name,
+                               bool is_atomic)
+  : std::shared_future<Response>(res_fut), is_detached_(is_detached), state_name_(state_name), is_atomic_(is_atomic)
 {
-
 }
 
-TransitionResult::TransitionResult(bool succeeded, const std::vector<ResponseFuture>& responses,
-                                   const std::string err_msg):
-    succeeded_(succeeded),
-    responses_(responses),
-    err_msg_(err_msg)
+TransitionResult::TransitionResult(bool succeeded,
+                                   const std::vector<ResponseFuture>& responses,
+                                   const std::string err_msg)
+  : succeeded_(succeeded), responses_(responses), err_msg_(err_msg)
 {
-
 }
 
 const ResponseFuture& TransitionResult::getResponse() const
 {
-  if(responses_.empty())
+  if (responses_.empty())
   {
     throw(std::runtime_error("Response unavailable, no entry callback was found for any of the active states"));
   }
@@ -233,7 +229,7 @@ std::shared_future<Response> StateMachine::EntryCbHandler::operator()(const Acti
   }
   else
   {
-    QtConcurrent::run(tpool_,[this, arg, promise_res](){
+    QtConcurrent::run(tpool_, [this, arg, promise_res]() {
       try
       {
         promise_res->set_value(cb_(arg));
@@ -445,12 +441,13 @@ TransitionResult StateMachine::executeAction(const Action& action)
   // check if valid transitions remain
   if (transition_ids.empty())
   {
-    std::string err_msg = boost::str(boost::format("Action '%s' is not valid for any of the active states") % action.id);
-    //res.success = false;
+    std::string err_msg =
+        boost::str(boost::format("Action '%s' is not valid for any of the active states") % action.id);
+    // res.success = false;
     LOG4CXX_ERROR(logger_, err_msg);
 
-    //res_promise.set_value(res);
-    return TransitionResult(false,{},err_msg);
+    // res_promise.set_value(res);
+    return TransitionResult(false, {}, err_msg);
   }
 
   int current_src_st_id = sm_info_->transitionSource(transition_ids.front());
@@ -469,8 +466,8 @@ TransitionResult StateMachine::executeAction(const Action& action)
   if (target_state_ids.empty())
   {
     std::string err_msg = boost::str(boost::format("No valid target states were found for transition %1% -> %2%") %
-                         current_src_st_name % action.id);
-    return TransitionResult(false,{},err_msg);
+                                     current_src_st_name % action.id);
+    return TransitionResult(false, {}, err_msg);
   }
 
   // checking precondition
@@ -486,12 +483,12 @@ TransitionResult StateMachine::executeAction(const Action& action)
         {
           precond_res.msg = boost::str(boost::format("Precondition for state %s failed: %s") % st % precond_res.msg);
         }
-        return TransitionResult(precond_res.success,{},precond_res.msg);
+        return TransitionResult(precond_res.success, {}, precond_res.msg);
       }))
   {
     // precondition failed, not proceeding with transition
     LOG4CXX_ERROR(logger_, precond_res.msg);
-    return TransitionResult(false,{},precond_res.msg);
+    return TransitionResult(false, {}, precond_res.msg);
   }
 
   // setting up synchronization variables*
@@ -539,7 +536,8 @@ TransitionResult StateMachine::executeAction(const Action& action)
     std::string err_msg = "SM timed out before finishing transition to states [" + target_states_str + "]";
     LOG4CXX_ERROR(logger_, err_msg);
     LOG4CXX_ERROR(logger_, "Current states are: " << current_states_str.c_str());
-    return TransitionResult(false,{},err_msg);;
+    return TransitionResult(false, {}, err_msg);
+    ;
   }
 
   // retrieve responses now
@@ -553,22 +551,22 @@ TransitionResult StateMachine::executeAction(const Action& action)
     bool is_detached = entry_callbacks_.at(st_name)->discard_response_;
     if (sm_private_->m_stateTable->state(state_id).isAtomic())
     {
-      responses_vec.insert(responses_vec.begin(), ResponseFuture(future,is_detached,st_name,true));
+      responses_vec.insert(responses_vec.begin(), ResponseFuture(future, is_detached, st_name, true));
     }
     else
     {
-      responses_vec.push_back(ResponseFuture(future,is_detached,st_name,false));
+      responses_vec.push_back(ResponseFuture(future, is_detached, st_name, false));
     }
     LOG4CXX_DEBUG(logger_, "Finished executing entry callback for state " << st_name);
   }
 
   if (futures_map.empty())
   {
-    return TransitionResult(true,{});
+    return TransitionResult(true, {});
   }
 
   LOG4CXX_DEBUG(logger_, "Retrieved response structure from future");
-  return TransitionResult(true,responses_vec);
+  return TransitionResult(true, responses_vec);
 }
 
 void StateMachine::signalSetup()
