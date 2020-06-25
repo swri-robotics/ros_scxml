@@ -93,7 +93,7 @@ std::string getStateFullName(const QScxmlStateMachineInfo* sm_info, const QScxml
     full_name = parent_name + "::" + full_name;
     parent_id = sm_info->stateParent(parent_id);
   }
-  return std::move(full_name);
+  return full_name;
 }
 
 // TODO: Decide whether to use this or delete it.  Not being used at the moment
@@ -101,7 +101,7 @@ TransitionTable buildTransitionTable(const QScxmlStateMachineInfo* sm_info)
 {
   TransitionTable table;
   QVector<QScxmlStateMachineInfo::TransitionId> transitions = sm_info->allTransitions();
-  for (std::size_t i = 0; i < transitions.size(); i++)
+  for (int i = 0; i < transitions.size(); i++)
   {
     auto transition_id = transitions[i];
 
@@ -139,7 +139,7 @@ TransitionTable buildTransitionTable(const QScxmlStateMachineInfo* sm_info)
 
     // mapping transition events to target states
     TransitionEventsMap event_states_map = {};
-    for (std::size_t j = 0; j < transition_events.size(); j++)
+    for (int j = 0; j < transition_events.size(); j++)
     {
       std::string tr_event_name = transition_events[j].toStdString();
       if (event_states_map.count(tr_event_name) > 0)
@@ -182,14 +182,14 @@ TransitionTable buildTransitionTable(const QScxmlStateMachineInfo* sm_info)
     }
   }
 
-  return std::move(table);
+  return table;
 }
 
 ResponseFuture::ResponseFuture(const std::shared_future<Response>& res_fut,
                                bool is_detached,
                                const std::string& state_name,
                                bool is_atomic)
-  : std::shared_future<Response>(res_fut), is_detached_(is_detached), state_name_(state_name), is_atomic_(is_atomic)
+  : std::shared_future<Response>(res_fut), is_detached_(is_detached), is_atomic_(is_atomic), state_name_(state_name)
 {
 }
 
@@ -209,10 +209,7 @@ const ResponseFuture& TransitionResult::getResponse() const
   return responses_.front();
 }
 
-const bool TransitionResult::hasPendingResponse() const
-{
-  return !responses_.empty() && !responses_.front().isDetached();
-}
+bool TransitionResult::hasPendingResponse() const { return !responses_.empty() && !responses_.front().isDetached(); }
 
 std::shared_future<Response> StateMachine::EntryCbHandler::operator()(const Action& arg)
 {
@@ -234,7 +231,7 @@ std::shared_future<Response> StateMachine::EntryCbHandler::operator()(const Acti
       {
         promise_res->set_value(cb_(arg));
       }
-      catch (std::future_error& e)
+      catch (std::future_error& /*e*/)
       {
         // Promise in entry callback already satisfied, no action needed
       }
@@ -244,8 +241,8 @@ std::shared_future<Response> StateMachine::EntryCbHandler::operator()(const Acti
 }
 
 StateMachine::StateMachine(double event_loop_period, log4cxx::LoggerPtr logger)
-  : sm_(nullptr)
-  , sm_info_(nullptr)
+  : sm_info_(nullptr)
+  , sm_(nullptr)
   , event_loop_period_(event_loop_period)
   , async_thread_pool_(new QThreadPool(this))
   , logger_(logger ? logger : DEFAULT_LOGGER)
@@ -253,9 +250,9 @@ StateMachine::StateMachine(double event_loop_period, log4cxx::LoggerPtr logger)
 }
 
 StateMachine::StateMachine(QScxmlStateMachine* sm, double event_loop_period, log4cxx::LoggerPtr logger)
-  : sm_(sm)
+  : sm_info_(new QScxmlStateMachineInfo(sm))
+  , sm_(sm)
   , sm_private_(QScxmlStateMachinePrivate::get(sm))
-  , sm_info_(new QScxmlStateMachineInfo(sm))
   , event_loop_period_(event_loop_period)
   , async_thread_pool_(new QThreadPool(this))
   , logger_(logger ? logger : DEFAULT_LOGGER)
@@ -310,7 +307,7 @@ bool StateMachine::start()
   execute_action_timer_ = new QTimer(this);
   connect(execute_action_timer_, &QTimer::timeout, [&]() { processQueuedActions(); });
 
-  execute_action_timer_->start(1000 * event_loop_period_);
+  execute_action_timer_->start(static_cast<int>(1000 * event_loop_period_));
   busy_executing_action_ = false;
   busy_consuming_entry_cb_ = false;
 
@@ -376,7 +373,7 @@ bool StateMachine::wait(double timeout) const
     timeout = std::numeric_limits<double>::infinity();
   }
 
-  QTime stop_time = QTime::currentTime().addMSecs(timeout * 1000);
+  QTime stop_time = QTime::currentTime().addMSecs(static_cast<int>(timeout * 1000));
   while (QTime::currentTime() < stop_time)
   {
     if (!isBusy())
@@ -687,7 +684,7 @@ std::vector<std::string> StateMachine::getAvailableActions() const
       return s.toStdString();
     });
   }
-  return std::move(action_ids);
+  return action_ids;
 }
 
 std::vector<std::string> StateMachine::getActions(const std::string& state_name) const
@@ -706,7 +703,7 @@ std::vector<std::string> StateMachine::getActions(const std::string& state_name)
       return s.toStdString();
     });
   }
-  return std::move(action_ids);
+  return action_ids;
 }
 
 std::string StateMachine::getCurrentState(bool full_name) const
@@ -721,8 +718,7 @@ std::string StateMachine::getCurrentState(bool full_name) const
       break;
     }
   }
-  return full_name ? getStateFullName(sm_info_, current_st_id) :
-                     std::move(sm_info_->stateName(current_st_id).toStdString());
+  return full_name ? getStateFullName(sm_info_, current_st_id) : sm_info_->stateName(current_st_id).toStdString();
 }
 
 std::vector<std::string> StateMachine::getStates(bool full_name) const
@@ -739,7 +735,7 @@ std::vector<std::string> StateMachine::getStates(bool full_name) const
       state_ids.begin(), state_ids.end(), std::back_inserter(st_names), [this, full_name](const SMInfo::StateId& id) {
         return full_name ? getStateFullName(sm_info_, id) : sm_info_->stateName(id).toStdString();
       });
-  return std::move(st_names);
+  return st_names;
 }
 
 bool StateMachine::hasState(const std::string state_name)
@@ -763,7 +759,7 @@ std::vector<std::string> StateMachine::getCurrentStates(bool full_name) const
       state_ids.begin(), state_ids.end(), std::back_inserter(st_names), [this, full_name](const SMInfo::StateId& id) {
         return full_name ? getStateFullName(sm_info_, id) : sm_info_->stateName(id).toStdString();
       });
-  return std::move(st_names);
+  return st_names;
 }
 
 bool StateMachine::hasAction(const std::string& state_name, const Action& action)
@@ -802,7 +798,6 @@ std::vector<int> StateMachine::getTransitionsIDs(const QVector<int>& states) con
 {
   using StateTable = QScxmlExecutableContent::StateTable;
   const StateTable* st_table = sm_private_->m_stateTable;
-  QScxmlDataModel* data_model = sm_private_->m_dataModel;
 
   std::vector<int> transition_ids;
   for (const int& id : states)
@@ -816,7 +811,7 @@ std::vector<int> StateMachine::getTransitionsIDs(const QVector<int>& states) con
     transition_ids.insert(transition_ids.end(), st_transitions.begin(), st_transitions.end());
   }
 
-  return std::move(transition_ids);
+  return transition_ids;
 }
 
 std::vector<int> StateMachine::getValidTransitionIDs() const
@@ -849,7 +844,7 @@ std::vector<int> StateMachine::getValidTransitionIDs() const
 
     valid_transition_ids.push_back(t_id);
   }
-  return std::move(valid_transition_ids);
+  return valid_transition_ids;
 }
 
 } /* namespace scxml_core */

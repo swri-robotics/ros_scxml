@@ -182,13 +182,13 @@ public:
    *        on the ResponseFuture
    * @return  a boolean
    */
-  const bool hasPendingResponse() const;
+  bool hasPendingResponse() const;
 
   /**
    * @brief the error message providing a brief description of the error that prevented the transition.
    * @return a string
    */
-  const std::string getErrorMessage() const { return err_msg_; }
+  std::string getErrorMessage() const { return err_msg_; }
 
 private:
   friend class StateMachine;
@@ -211,7 +211,7 @@ private:
   {
   public:
     EntryCbHandler(QThreadPool* thread_pool, EntryCallback cb, bool discard_response = false)
-      : cb_(cb), discard_response_(discard_response), tpool_(thread_pool)
+      : discard_response_(discard_response), cb_(cb), tpool_(thread_pool)
     {
     }
 
