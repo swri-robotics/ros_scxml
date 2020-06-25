@@ -56,6 +56,8 @@ namespace scxml_core
 {
 struct Action
 {
+  Action() = default;
+  Action(std::string id, boost::any data = boost::any()) : id(id), data(data){};
   std::string id;  /**@brief name of the event */
   boost::any data; /**@brief optional data needed by the state */
 
