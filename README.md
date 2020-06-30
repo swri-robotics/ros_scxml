@@ -34,10 +34,18 @@ The QScxml library is only available from version Qt 5.7 and higher. This implem
 In order to make this library accessible to cmake the `CMAKE_MODULE_PATH` and `LD_LIBRARY_PATH` environment variables must be set.  Locate your Qt installation directory (usually in the */opt* directory) and set the environment variables as follows:
 
 ```bash
-export CMAKE_MODULE_PATH=<path>/<to>/<qt>/lib/cmake:$PATH
+export PATH=<path>/<to>/<qt>/lib/cmake:$PATH
 export LD_LIBRARY_PATH=<path>/<to>/<qt>/lib:$LD_LIBRARY_PATH
 export LD_LIBRARY_PATH=<path>/<to>/<qt>/plugins:$LD_LIBRARY_PATH  
 ```
+
+For the version installed above qt513 it would be as follows:
+```bash
+export PATH="/opt/qt513/lib/cmake:$PATH"
+export LD_LIBRARY_PATH=/opt/qt513/lib:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=/opt/qt513/plugins:$LD_LIBRARY_PATH
+```
+
 ---
 ## Demo program
 ### Description
