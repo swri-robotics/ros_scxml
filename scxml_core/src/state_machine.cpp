@@ -741,7 +741,7 @@ std::vector<std::string> StateMachine::getStates(bool full_name) const
 bool StateMachine::hasState(const std::string state_name)
 {
   QStringList st_list = sm_->stateNames(false);
-  bool found =  std::any_of(
+  bool found = std::any_of(
       st_list.begin(), st_list.end(), [&state_name](QString& st) { return state_name == st.toStdString(); });
   return found;
 }
