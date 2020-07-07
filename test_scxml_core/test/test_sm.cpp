@@ -19,7 +19,14 @@ TEST_F(TestSM, test_list_state)
 {
   std::vector<std::string> all_states = sm->getStates();
   EXPECT_EQ(all_states.size(), 4);
+  EXPECT_TRUE(std::find(all_states.begin(), all_states.end(), "State_1") != all_states.end());
+  EXPECT_TRUE(std::find(all_states.begin(), all_states.end(), "State_2") != all_states.end());
+  EXPECT_TRUE(std::find(all_states.begin(), all_states.end(), "State_3") != all_states.end());
+  EXPECT_TRUE(std::find(all_states.begin(), all_states.end(), "Final_1") != all_states.end());
+  EXPECT_FALSE(std::find(all_states.begin(), all_states.end(), "State_NOT_HERE") != all_states.end());
 }
+
+TEST_F(TestSM, test_transitions) {}
 
 int main(int argc, char** argv)
 {
