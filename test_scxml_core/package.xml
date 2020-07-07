@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>test_scxml_core</name>
+  <version>0.0.0</version>
+  <description>Test package for the scxml_core library package</description>
+
+  <maintainer email="jrgnichodevel@gmail.com">Jorge Nicho</maintainer>
+
+  <license>BSD3</license>
+
+  <buildtool_depend>catkin</buildtool_depend>
+  <build_depend>roslib</build_depend>
+  <test_depend>rosunit</test_depend>
+  <test_depend>scxml_core</test_depend>
+  
+
+  <export>
+  </export>
+</package>
