@@ -475,7 +475,10 @@ TransitionResult StateMachine::executeAction(const Action& action)
         {
           return true;  // no precondition
         }
-        precond_res = precond_callbacks_[st](action);
+        for (auto cb : precond_callbacks_[st])
+        {
+          precond_res = cb(action);
+        }
         if (!precond_res)
         {
           precond_res.msg = boost::str(boost::format("Precondition for state %s failed: %s") % st % precond_res.msg);
@@ -630,11 +633,11 @@ bool StateMachine::addPreconditionCallback(const std::string& st_name, Precondit
     return false;
   }
 
-  if (precond_callbacks_.count(st_name) > 0)
-  {
-    LOG4CXX_WARN(logger_, "Pre-condition callback for state %s will be replaced" << st_name);
-  }
-  precond_callbacks_.insert(std::make_pair(st_name, cb));
+  auto pc = precond_callbacks_.find(st_name);
+  if (pc == precond_callbacks_.end())
+    precond_callbacks_.insert(std::make_pair(st_name, std::vector<PreconditionCallback>({cb})));
+  else
+    pc->second.push_back(cb);
 
   return true;
 }

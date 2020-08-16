@@ -341,7 +341,7 @@ protected:
   std::shared_future<Action> action_future_;
   using ResponseFuturesMap = std::map<int, std::shared_future<Response>>;
   std::promise<ResponseFuturesMap> responses_map_promise_;
-  std::map<std::string, PreconditionCallback> precond_callbacks_;
+  std::map<std::string, std::vector<PreconditionCallback>> precond_callbacks_;
   std::map<std::string, EntryCbHandlerPtr> entry_callbacks_;
   std::map<std::string, std::function<void()>> exit_callbacks_;
   QThreadPool* async_thread_pool_;
