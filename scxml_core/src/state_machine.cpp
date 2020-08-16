@@ -638,9 +638,13 @@ bool StateMachine::addPreconditionCallback(const std::string& st_name, Precondit
 
   auto pc = precond_callbacks_.find(st_name);
   if (pc == precond_callbacks_.end())
+  {
     precond_callbacks_.insert(std::make_pair(st_name, std::vector<PreconditionCallback>({cb})));
+  }
   else
+  {
     pc->second.push_back(cb);
+  }
 
   return true;
 }
