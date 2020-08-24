@@ -438,8 +438,9 @@ TransitionResult StateMachine::executeAction(const Action& action)
   // check if valid transitions remain
   if (transition_ids.empty())
   {
+    const std::string active_states = sm_->activeStateNames().join(", ").toStdString();
     std::string err_msg =
-        boost::str(boost::format("Action '%s' is not valid for any of the active states") % action.id);
+        boost::str(boost::format("Action '%s' is not valid for active states [%s]") % action.id % active_states);
     // res.success = false;
     LOG4CXX_ERROR(logger_, err_msg);
 
