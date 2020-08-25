@@ -481,7 +481,8 @@ TransitionResult StateMachine::executeAction(const Action& action)
           if (!precond_res)
           {
             // break on the first failed precondition
-            precond_res.msg = boost::str(boost::format("Precondition %i for state %s failed: %s") % i % st % precond_res.msg);
+            precond_res.msg =
+                boost::str(boost::format("Precondition %i for state %s failed: %s") % i % st % precond_res.msg);
             break;
           }
         }
