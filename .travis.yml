@@ -23,42 +23,27 @@ env:
 jobs:
   include:
     - os: linux
-      dist: bionic
+      dist: focal
       language: cpp
       env:
-      - ROS_DISTRO="dashing"
+      - ROS_DISTRO="noetic"
       - CLANG_FORMAT_CHECK=file
       - CLANG_FORMAT_VERSION=8
-      - AFTER_SCRIPT=""
-      - BADGE="dashing"
-      - ROSDEP_SKIP_KEYS="catkin roscpp"
       cache:
         directories:
           - $HOME/.ccache
 
     - os: linux
-      dist: bionic
+      dist: focal
       language: cpp
       env:
-      - DOCKER_IMAGE=mpowelson/bionic-qt-ros:eloquent
-      - ROS_DISTRO="eloquent"
-      - NOT_TEST_BUILD=true
-      - BEFORE_INIT="apt-key adv --keyserver 'hkp://keyserver.ubuntu.com:80' --recv-key C1CF6E31E6BADE8868B172B4F42ED6FBAB17C654"
-      - BADGE=eloquent
-      - ROSDEP_SKIP_KEYS="catkin roscpp"
-      cache:
-        directories:
-          - $HOME/.ccache
-
-    - os: linux
-      dist: bionic
-      language: cpp
-      env:
-      - ROS_DISTRO="melodic"
-      - CLANG_FORMAT_CHECK=file
-      - CLANG_FORMAT_VERSION=8
-      - BADGE=melodic
-      - ROSDEP_SKIP_KEYS="ament_cmake rclcpp ament_lint_auto ament_lint_common"
+      - ROS_DISTRO="noetic"
+      - BADGE="noetic"
+      - ROSDEP_SKIP_KEYS="cmake_common_scripts"
+      - DOCKER_IMAGE="ros:noetic"
+      - ADDITIONAL_DEBS="qt5-default libqt5scxml5-dev libqt5scxml5-bin qtdeclarative5-dev"
+      - UPSTREAM_WORKSPACE="dependencies.rosinstall"
+      - TARGET_CMAKE_ARGS="-DSCXML_CORE_ENABLE_TESTING=ON"
       cache:
         directories:
           - $HOME/.ccache
