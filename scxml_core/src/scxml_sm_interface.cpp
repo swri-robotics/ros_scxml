@@ -1,6 +1,7 @@
 #include <scxml_core/scxml_sm_interface.h>
 #include <sstream>
 #include <tinyxml2.h>
+#include <QtConcurrent/QtConcurrent>
 
 static const char* SCXML_ELEMENT = "scxml";
 static const char* STATE_ELEMENT = "state";
@@ -127,13 +128,28 @@ ScxmlSMInterface::ScxmlSMInterface(const std::string& scxml_file)
     if (state_transition_map_.find(state) == state_transition_map_.end())
       throw std::runtime_error("State transition map does not contain state '" + state.toStdString() + "'");
   }
+
+  // Initialize the future map for each state
+  for (const QString& state : states)
+  {
+    future_map_[state] = QFuture<void>{};
+  }
 }
 
-void ScxmlSMInterface::addOnEntryCallback(const QString& state, const std::function<void()>& callback)
+void ScxmlSMInterface::addOnEntryCallback(const QString& state, const std::function<void()>& callback, bool async)
 {
   if (state_transition_map_.find(state) == state_transition_map_.end())
     throw std::runtime_error("State '" + state.toStdString() + "' is not known");
-  sm_->connectToState(state, QScxmlStateMachine::onEntry(callback));
+
+  if (async)
+  {
+    auto async_cb = [this, state, callback]() { this->future_map_[state] = QtConcurrent::run(callback); };
+    sm_->connectToState(state, QScxmlStateMachine::onEntry(async_cb));
+  }
+  else
+  {
+    sm_->connectToState(state, QScxmlStateMachine::onEntry(callback));
+  }
 }
 
 void ScxmlSMInterface::addOnExitCallback(const QString& state, const std::function<void()>& callback)
@@ -143,26 +159,44 @@ void ScxmlSMInterface::addOnExitCallback(const QString& state, const std::functi
   sm_->connectToState(state, QScxmlStateMachine::onExit(callback));
 }
 
-void ScxmlSMInterface::submitEvent(const QString& event)
+bool ScxmlSMInterface::submitEvent(const QString& event, bool force)
 {
   QStringList active_states = sm_->activeStateNames();
-  for (const QString& state : active_states)
+
+  // Ensure at least one of the active states has the specified transition
+  auto it = std::find_if(active_states.begin(), active_states.end(), [this, event](const QString& state) -> bool {
+    return this->state_transition_map_.at(state).contains(event);
+  });
+
+  if (it == active_states.end())
   {
-    if (state_transition_map_.at(state).contains(event))
+    std::stringstream ss;
+    ss << "Transition '" << event.toStdString() << "' was not defined for active states [ ";
+    for (const QString& state : active_states)
     {
-      sm_->submitEvent(event);
-      return;
+      ss << state.toStdString() << " ";
+    }
+    ss << "]";
+    throw std::runtime_error(ss.str());
+  }
+
+  // Make sure the asynchronous callbacks for all active states have been completed
+  if (!force)
+  {
+    for (const QString& state : active_states)
+    {
+      if (state_transition_map_.at(state).contains(event))
+      {
+        // Check if the asynchronous callback is finished before submitting the event
+        if (!future_map_.at(state).isFinished())
+          return false;
+      }
     }
   }
 
-  std::stringstream ss;
-  ss << "Transition '" << event.toStdString() << "' was not defined for active states [ ";
-  for (const QString& state : active_states)
-  {
-    ss << state.toStdString() << " ";
-  }
-  ss << "]";
-  throw std::runtime_error(ss.str());
+  // Submit the event
+  sm_->submitEvent(event);
+  return true;
 }
 
 }  // namespace scxml_core

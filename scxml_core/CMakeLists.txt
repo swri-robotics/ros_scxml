@@ -16,6 +16,7 @@ add_library(${PROJECT_NAME} SHARED
 )
 target_link_libraries(${PROJECT_NAME} PUBLIC
   Qt5::Scxml
+  Qt5::Core
   ${TinyXML2_LIBRARIES}
 )
 target_include_directories(${PROJECT_NAME} PUBLIC
