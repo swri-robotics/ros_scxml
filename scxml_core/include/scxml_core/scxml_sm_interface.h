@@ -49,4 +49,4 @@ protected:
   StateTransitionMap state_transition_map_;
 };
 
-} // namespace scxml_core
+}  // namespace scxml_core

@@ -19,7 +19,9 @@ private slots:
       // If we made it this far, we fail
       QVERIFY(false);
     }
-    catch(const std::exception&) {}
+    catch (const std::exception&)
+    {
+    }
 
     try
     {
@@ -28,7 +30,9 @@ private slots:
       // If we made it this far, we fail
       QVERIFY(false);
     }
-    catch(const std::exception&) {}
+    catch (const std::exception&)
+    {
+    }
   }
 
   void badCallbacksAndEvents()
@@ -99,18 +103,12 @@ private slots:
     QVERIFY(sm.getSM()->isRunning());
 
     // Define a list of events and corresponding states from the test state machine
-    QList<QPair<QString, QString>> list{ { "trAborted", "st2Aborted" },
-                                         { "userClear", "st2Clearing" },
-                                         { "trStopped", "st2Stopped" },
-                                         { "userReset", "st3Reseting" },
-                                         { "trIdle", "st3Idle" },
-                                         { "userStart", "st3Starting" },
-                                         { "trExecute", "st3Execute" },
-                                         { "pause", "st2Pause" },
-                                         { "resume", "st3Execute" },
-                                         { "trExecuting", "st3Completing" },
-                                         { "trCompleting", "st3Complete" }
-    };
+    QList<QPair<QString, QString>> list{ { "trAborted", "st2Aborted" },    { "userClear", "st2Clearing" },
+                                         { "trStopped", "st2Stopped" },    { "userReset", "st3Reseting" },
+                                         { "trIdle", "st3Idle" },          { "userStart", "st3Starting" },
+                                         { "trExecute", "st3Execute" },    { "pause", "st2Pause" },
+                                         { "resume", "st3Execute" },       { "trExecuting", "st3Completing" },
+                                         { "trCompleting", "st3Complete" } };
 
     // Submit the events and check that the state machine moves to the corresponding state
     for (int i = 0; i < list.size(); ++i)
@@ -126,4 +124,3 @@ private slots:
 
 QTEST_MAIN(UTest);
 #include "utest.moc"
-

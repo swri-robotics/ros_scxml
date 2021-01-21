@@ -165,4 +165,4 @@ void ScxmlSMInterface::submitEvent(const QString& event)
   throw std::runtime_error(ss.str());
 }
 
-} // namespace scxml_core
+}  // namespace scxml_core
