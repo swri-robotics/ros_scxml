@@ -1,14 +1,14 @@
 <?xml version="1.0"?>
 <package format="3">
   <name>scxml_core</name>
-  <version>0.0.0</version>
+  <version>0.2.0</version>
   <description>The ros scxml package</description>
 
   <maintainer email="jrgnichodevel@gmail.com">Jorge Nicho</maintainer>
   <license>BSD3</license>
 
-  <depend>boost</depend>
-  <depend>log4cxx</depend>
+  <depend>cmake_common_scripts</depend>
+  <depend>tinyxml2</depend>
 
   <export>
     <build_type> cmake </build_type>
