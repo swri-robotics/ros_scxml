@@ -2,6 +2,7 @@
 #include <QScxmlStateMachine>
 #include <QString>
 #include <QSet>
+#include <QFuture>
 
 namespace scxml_core
 {
@@ -24,9 +25,10 @@ public:
 
   /**
    * @brief Adds a callback to the input state that will be invoked on entry to the state
+   * @param async - flag for executing the input callback asynchronously
    * @throws exception if the state does not exist in the state machine
    */
-  void addOnEntryCallback(const QString& state, const std::function<void()>& callback);
+  void addOnEntryCallback(const QString& state, const std::function<void()>& callback, bool async = false);
 
   /**
    * @brief Adds a callback to the input state that will be invoked when leaving the state
@@ -36,17 +38,24 @@ public:
 
   /**
    * @brief Submits an event to move the state machine to a different state
+   * @param force - force the submission of the event, even if the asynchronous task isn't finished
+   * @return True if the asynchronous callback for the current state was finished and the event could be posted, false
+   * otherwise
    * @throws if the event is not a valid transition
    */
-  void submitEvent(const QString& event);
+  bool submitEvent(const QString& event, bool force = false);
 
   inline const QScxmlStateMachine* getSM() const { return sm_; }
   inline QScxmlStateMachine* getSM() { return sm_; }
   inline StateTransitionMap getStateTransitionMap() const { return state_transition_map_; }
 
+  /** @brief Provides access to the future of an asynchronous callback for the input state */
+  inline QFuture<void>& getStateFuture(const QString& state) { return future_map_.at(state); }
+
 protected:
   QScxmlStateMachine* sm_;
-  StateTransitionMap state_transition_map_;
+  const StateTransitionMap state_transition_map_;
+  std::map<QString, QFuture<void>> future_map_;
 };
 
 }  // namespace scxml_core
