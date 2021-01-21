@@ -4,7 +4,7 @@ project(scxml_core VERSION 0.2.0 LANGUAGES CXX)
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake/")
 
 find_package(cmake_common_scripts REQUIRED)
-find_package(Qt5 REQUIRED COMPONENTS Scxml)
+find_package(Qt5 REQUIRED COMPONENTS Core Scxml)
 find_package(TinyXML2 REQUIRED)
 
 ###########
@@ -23,11 +23,16 @@ target_include_directories(${PROJECT_NAME} PUBLIC
     "$<INSTALL_INTERFACE:include>")
 target_cxx_version(${PROJECT_NAME} PUBLIC VERSION 14)
 
+# Demo executable
+add_executable(${PROJECT_NAME}_demo src/demo.cpp)
+target_link_libraries(${PROJECT_NAME}_demo PUBLIC ${PROJECT_NAME} Qt5::Core)
+target_cxx_version(${PROJECT_NAME}_demo PUBLIC VERSION 14)
+
 #############
 ## Install ##
 #############
 
-configure_package(NAMESPACE scxml_core TARGETS ${PROJECT_NAME})
+configure_package(NAMESPACE scxml_core TARGETS ${PROJECT_NAME} ${PROJECT_NAME}_demo)
 
 install(DIRECTORY include/
   DESTINATION include
