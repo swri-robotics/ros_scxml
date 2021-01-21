@@ -34,6 +34,23 @@ jobs:
           - $HOME/.ccache
 
     - os: linux
+      dist: bionic
+      language: cpp
+      env:
+      - ROS_DISTRO="melodic"
+      - BADGE="melodic"
+      - ROSDEP_SKIP_KEYS="cmake_common_scripts"
+      - DOCKER_IMAGE="ros:melodic"
+      - ADDITIONAL_DEBS="qt5-default qtdeclarative5-dev software-properties-common"
+      - BEFORE_INSTALL_UPSTREAM_DEPENDENCIES="./.add_qt_ppa_bionic.sh"
+      - UPSTREAM_WORKSPACE="dependencies.rosinstall"
+      - TARGET_CMAKE_ARGS="-DENABLE_TESTING=ON"
+      - AFTER_SCRIPT='cd "$target_ws/build/scxml_core" && ctest -V'
+      cache:
+        directories:
+          - $HOME/.ccache
+
+    - os: linux
       dist: focal
       language: cpp
       env:
@@ -44,7 +61,7 @@ jobs:
       - ADDITIONAL_DEBS="qt5-default libqt5scxml5-dev libqt5scxml5-bin qtdeclarative5-dev"
       - UPSTREAM_WORKSPACE="dependencies.rosinstall"
       - TARGET_CMAKE_ARGS="-DENABLE_TESTING=ON"
-      - AFTER_SCRIPT="cd $target_ws/build/scxml_core && ctest -V"
+      - AFTER_SCRIPT='cd "$target_ws/build/scxml_core" && ctest -V'
       cache:
         directories:
           - $HOME/.ccache
