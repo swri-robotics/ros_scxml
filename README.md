@@ -109,10 +109,8 @@ Locate your Qt installation directory in the `/opt` directory and set the enviro
 export CMAKE_PREFIX_PATH=/opt/qt<version>/lib/cmake:$CMAKE_PREFIX_PATH
 export LD_LIBRARY_PATH=/opt/qt<version>/lib:/opt/qt<version>/plugins:$LD_LIBRARY_PATH
 ```
-<<<<<<< HEAD
->>>>>>> Updated README
 =======
 
 #### Alternative Download (Qt Installer)
 The library can be downloaded from [here](http://download.qt.io/official_releases/qt/).  Run the installation script with root access and follow the on screen instructions.
->>>>>>> Updated README
+

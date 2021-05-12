@@ -3,7 +3,7 @@ project(scxml_core VERSION 0.2.0 LANGUAGES CXX)
 
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake/")
 
-find_package(cmake_common_scripts REQUIRED)
+find_package(ros_industrial_cmake_boilerplate REQUIRED)
 find_package(Qt5 REQUIRED COMPONENTS Core Scxml)
 find_package(TinyXML2 REQUIRED)
 
@@ -37,6 +37,13 @@ configure_package(NAMESPACE scxml_core TARGETS ${PROJECT_NAME} ${PROJECT_NAME}_d
 
 install(DIRECTORY include/
   DESTINATION include
+)
+
+install(
+  FILES
+    "${CMAKE_CURRENT_LIST_DIR}/cmake/FindTinyXML2.cmake"
+  DESTINATION
+    lib/cmake/${PROJECT_NAME}
 )
 
 ##########
