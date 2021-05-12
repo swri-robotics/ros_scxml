@@ -12,6 +12,6 @@ else()
 endif()
 find_dependency(Qt5Test)
 find_dependency(TinyXML2)
-find_dependency(cmake_common_scripts)
+find_dependency(ros_industrial_cmake_boilerplate)
 
 include("${CMAKE_CURRENT_LIST_DIR}/@PROJECT_NAME@-targets.cmake")

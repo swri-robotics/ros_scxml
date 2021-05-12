@@ -7,7 +7,7 @@
   <maintainer email="jrgnichodevel@gmail.com">Jorge Nicho</maintainer>
   <license>BSD3</license>
 
-  <depend>cmake_common_scripts</depend>
+  <depend>ros_industrial_cmake_boilerplate</depend>
   <depend>tinyxml2</depend>
 
   <export>
