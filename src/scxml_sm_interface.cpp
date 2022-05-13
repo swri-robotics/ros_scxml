@@ -49,12 +49,12 @@ static void getStateTransitionsRecursive(tinyxml2::XMLElement* state,
 
       const char* name = transition->Attribute(TARGET_ATTRIBUTE);
 
-      std::pair<QString, Qstring> list = std::make_pair(event,name);
+      std::pair<QString, QString> list = std::make_pair (QString(event),QString(name));
       
       inherited_events.insert(list);
 
       // Add the event name to the map
-      // map.at(state_id).insert(list);
+      map[state_id] = inherited_events;
 
       // Get the next transition element
       transition = transition->NextSiblingElement(TRANSITION_ELEMENT);
@@ -78,7 +78,7 @@ static void getStateTransitionsRecursive(tinyxml2::XMLElement* state,
                                std::string(HISTORY_STATE_ID_ATTRIBUTE) + "' attribute");
 
     // Add this state to the map
-    map[QString(id)] = QSet<QString>{};
+    map[QString(id)] = std::set<std::pair<QString, QString>>{};
 
     // History states do not have transitions or nested states, so no need to recurse into it
     history = history->NextSiblingElement(HISTORY_STATE_ELEMENT);
@@ -109,7 +109,7 @@ StateTransitionMap getStateTransitionMap(const std::string& scxml_file)
   StateTransitionMap map;
   while (state)
   {
-    getStateTransitionsRecursive(state, map, QSet<QString>{});
+    getStateTransitionsRecursive(state, map, std::set<std::pair<QString, QString>>{});
     state = state->NextSiblingElement(STATE_ELEMENT);
   }
 
@@ -143,6 +143,36 @@ ScxmlSMInterface::ScxmlSMInterface(const std::string& scxml_file)
   }
 }
 
+// use this to determine the next state in the state machine, given the name of the transition you'd like to query
+const QString ScxmlSMInterface::getNeighbor(const QString& state, scxml_core::StateTransitionMap& map, const QString& search_text) {
+  QString next_state;
+        
+        for (auto& pair : map.at(state))
+        {
+          if (pair.first == search_text)
+            {
+//              next_state = pair.second();
+              return pair.second;
+            }
+            else {
+              next_state = state;
+              }
+        }
+        return next_state;
+}
+
+bool ScxmlSMInterface::eventExists(const QString& event, std::set<std::pair<QString, QString>> events)
+    {
+        for (auto& pair : events)
+          {
+            if (pair.first == event)
+            {
+              return true;
+            }
+            return false;
+          }
+    }
+
 void ScxmlSMInterface::addOnEntryCallback(const QString& state, const std::function<void()>& callback, bool async)
 {
   if (state_transition_map_.find(state) == state_transition_map_.end())
@@ -172,7 +202,7 @@ bool ScxmlSMInterface::submitEvent(const QString& event, bool force)
 
   // Ensure at least one of the active states has the specified transition
   auto it = std::find_if(active_states.begin(), active_states.end(), [this, event](const QString& state) -> bool {
-    return this->state_transition_map_.at(state).contains(event);
+    return eventExists(event,state_transition_map_.at(state));
   });
 
   if (it == active_states.end())
@@ -192,7 +222,7 @@ bool ScxmlSMInterface::submitEvent(const QString& event, bool force)
   {
     for (const QString& state : active_states)
     {
-      if (state_transition_map_.at(state).contains(event))
+      if (eventExists(event,state_transition_map_.at(state)))
       {
         // Check if the asynchronous callback is finished before submitting the event
         if (!future_map_.at(state).isFinished())
