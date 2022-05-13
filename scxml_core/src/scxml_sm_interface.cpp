@@ -10,6 +10,7 @@ static const char* HISTORY_STATE_ELEMENT = "history";
 static const char* HISTORY_STATE_ID_ATTRIBUTE = "id";
 static const char* TRANSITION_ELEMENT = "transition";
 static const char* EVENT_ATTRIBUTE = "event";
+static const char* TARGET_ATTRIBUTE = "target";
 
 /**
  * @brief Recursively adds states and transitions to the map
@@ -18,7 +19,7 @@ static const char* EVENT_ATTRIBUTE = "event";
  */
 static void getStateTransitionsRecursive(tinyxml2::XMLElement* state,
                                          scxml_core::StateTransitionMap& map,
-                                         QSet<QString> inherited_events)
+                                         std::set<std::pair<QString, QString>> inherited_events)
 {
   using namespace tinyxml2;
 
@@ -40,17 +41,23 @@ static void getStateTransitionsRecursive(tinyxml2::XMLElement* state,
   XMLElement* transition = state->FirstChildElement(TRANSITION_ELEMENT);
   while (transition)
   {
-    // Get the name of the event associated with this transition
-    const char* event = transition->Attribute(EVENT_ATTRIBUTE);
-    if (!event)
-      throw std::runtime_error("'" + std::string(TRANSITION_ELEMENT) + "' element does not have '" +
-                               std::string(EVENT_ATTRIBUTE) + "' attribute");
+      // Get the name of the event associated with this transition
+      const char* event = transition->Attribute(EVENT_ATTRIBUTE);
+      if (!event)
+          throw std::runtime_error("'" + std::string(TRANSITION_ELEMENT) + "' element does not have '" +
+                                   std::string(EVENT_ATTRIBUTE) + "' attribute");
 
-    // Add the event name to the map
-    map.at(state_id).insert(event);
+      const char* name = transition->Attribute(TARGET_ATTRIBUTE);
 
-    // Get the next transition element
-    transition = transition->NextSiblingElement(TRANSITION_ELEMENT);
+      std::pair<QString, Qstring> list = std::make_pair(event,name);
+      
+      inherited_events.insert(list);
+
+      // Add the event name to the map
+      // map.at(state_id).insert(list);
+
+      // Get the next transition element
+      transition = transition->NextSiblingElement(TRANSITION_ELEMENT);
   }
 
   // Recurse if this node has nested state elements
