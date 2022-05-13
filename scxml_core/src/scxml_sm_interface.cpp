@@ -49,7 +49,7 @@ static void getStateTransitionsRecursive(tinyxml2::XMLElement* state,
 
       const char* name = transition->Attribute(TARGET_ATTRIBUTE);
 
-      std::pair<QString, Qstring> list = std::make_pair(event,name);
+      std::pair<QString, Qstring> list = std::make_pair (event,name);
       
       inherited_events.insert(list);
 
@@ -141,6 +141,18 @@ ScxmlSMInterface::ScxmlSMInterface(const std::string& scxml_file)
   {
     future_map_[state] = QFuture<void>{};
   }
+}
+
+// use this to determine the next state in the state machine, given the name of the transition you'd like to query
+const QString next_state ScxmlSMInterface::getNeighbor(const QString& state, scxml_core::StateTransitionMap& map, std::QString search_text) {
+        std::map<QString, std::set<std::pair<QString, QString>>> = map;
+        std::pair<QString, QString> pair;
+        
+        for pair in map.at(state):
+          if pair.first() == text:
+            next_state = pair.second();
+            return;
+          next_state = state;
 }
 
 void ScxmlSMInterface::addOnEntryCallback(const QString& state, const std::function<void()>& callback, bool async)
