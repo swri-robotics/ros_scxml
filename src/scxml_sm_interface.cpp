@@ -41,23 +41,23 @@ static void getStateTransitionsRecursive(tinyxml2::XMLElement* state,
   XMLElement* transition = state->FirstChildElement(TRANSITION_ELEMENT);
   while (transition)
   {
-      // Get the name of the event associated with this transition
-      const char* event = transition->Attribute(EVENT_ATTRIBUTE);
-      if (!event)
-          throw std::runtime_error("'" + std::string(TRANSITION_ELEMENT) + "' element does not have '" +
-                                   std::string(EVENT_ATTRIBUTE) + "' attribute");
+    // Get the name of the event associated with this transition
+    const char* event = transition->Attribute(EVENT_ATTRIBUTE);
+    if (!event)
+      throw std::runtime_error("'" + std::string(TRANSITION_ELEMENT) + "' element does not have '" +
+                               std::string(EVENT_ATTRIBUTE) + "' attribute");
 
-      const char* name = transition->Attribute(TARGET_ATTRIBUTE);
+    const char* name = transition->Attribute(TARGET_ATTRIBUTE);
 
-      std::pair<QString, QString> list = std::make_pair (QString(event),QString(name));
-      
-      inherited_events.insert(list);
+    std::pair<QString, QString> list = std::make_pair(QString(event), QString(name));
 
-      // Add the event name to the map
-      map[state_id] = inherited_events;
+    inherited_events.insert(list);
 
-      // Get the next transition element
-      transition = transition->NextSiblingElement(TRANSITION_ELEMENT);
+    // Add the event name to the map
+    map[state_id] = inherited_events;
+
+    // Get the next transition element
+    transition = transition->NextSiblingElement(TRANSITION_ELEMENT);
   }
 
   // Recurse if this node has nested state elements
@@ -144,34 +144,32 @@ ScxmlSMInterface::ScxmlSMInterface(const std::string& scxml_file)
 }
 
 // use this to determine the next state in the state machine, given the name of the transition you'd like to query
-const QString ScxmlSMInterface::getNeighbor(const QString& state, scxml_core::StateTransitionMap& map, const QString& search_text) {
+const QString ScxmlSMInterface::getNeighbor(const QString& state, const QString& search_text)
+{
   QString next_state;
-        
-        for (auto& pair : map.at(state))
-        {
-          if (pair.first == search_text)
-            {
-//              next_state = pair.second();
-              return pair.second;
-            }
-            else {
-              next_state = state;
-              }
-        }
-        return next_state;
+
+  for (auto& pair : state_transition_map_.at(state))
+  {
+    if (pair.first == search_text)
+    {
+      //              next_state = pair.second();
+      return pair.second;
+    }
+  }
+  return next_state;
 }
 
 bool ScxmlSMInterface::eventExists(const QString& event, std::set<std::pair<QString, QString>> events)
+{
+  for (auto& pair : events)
+  {
+    if (pair.first == event)
     {
-        for (auto& pair : events)
-          {
-            if (pair.first == event)
-            {
-              return true;
-            }
-            return false;
-          }
+      return true;
     }
+    return false;
+  }
+}
 
 void ScxmlSMInterface::addOnEntryCallback(const QString& state, const std::function<void()>& callback, bool async)
 {
@@ -202,7 +200,7 @@ bool ScxmlSMInterface::submitEvent(const QString& event, bool force)
 
   // Ensure at least one of the active states has the specified transition
   auto it = std::find_if(active_states.begin(), active_states.end(), [this, event](const QString& state) -> bool {
-    return eventExists(event,state_transition_map_.at(state));
+    return eventExists(event, state_transition_map_.at(state));
   });
 
   if (it == active_states.end())
@@ -222,7 +220,7 @@ bool ScxmlSMInterface::submitEvent(const QString& event, bool force)
   {
     for (const QString& state : active_states)
     {
-      if (eventExists(event,state_transition_map_.at(state)))
+      if (eventExists(event, state_transition_map_.at(state)))
       {
         // Check if the asynchronous callback is finished before submitting the event
         if (!future_map_.at(state).isFinished())
