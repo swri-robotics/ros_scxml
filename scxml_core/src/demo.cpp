@@ -49,35 +49,36 @@ int main(int argc, char** argv)
       }
       ss << "]";
 
-//      // Get user input as to which event to execute
-//      bool done = false;
-//      while (!done)
-//      {
-//        std::cout << ss.str() << std::endl;
+      //      // Get user input as to which event to execute
+      //      bool done = false;
+      //      while (!done)
+      //      {
+      //        std::cout << ss.str() << std::endl;
 
-//        // Get the character input
-//        auto input = std::cin.get();
-//        // Throw away the enter input
-//        std::cin.get();
+      //        // Get the character input
+      //        auto input = std::cin.get();
+      //        // Throw away the enter input
+      //        std::cin.get();
 
-//        if (std::isdigit(input))
-//        {
-//          int idx = static_cast<int>(input) - 48;
-//          if (idx < available_events.size())
-//          {
-//            interface.submitEvent(available_events.toList().at(idx));
-//            done = true;
-//          }
-//          else
-//          {
-//            std::cout << "Index " << idx << " was not in range [0, " << available_events.size() - 1 << "]" << std::endl;
-//          }
-//        }
-//        else
-//        {
-//          std::cout << "Input must be numeric" << std::endl;
-//        }
-//      }
+      //        if (std::isdigit(input))
+      //        {
+      //          int idx = static_cast<int>(input) - 48;
+      //          if (idx < available_events.size())
+      //          {
+      //            interface.submitEvent(available_events.toList().at(idx));
+      //            done = true;
+      //          }
+      //          else
+      //          {
+      //            std::cout << "Index " << idx << " was not in range [0, " << available_events.size() - 1 << "]" <<
+      //            std::endl;
+      //          }
+      //        }
+      //        else
+      //        {
+      //          std::cout << "Input must be numeric" << std::endl;
+      //        }
+      //      }
     }
   }
   catch (const std::exception& ex)
