@@ -155,10 +155,6 @@ const QString ScxmlSMInterface::getNeighbor(const QString& state, const QString&
       //              next_state = pair.second();
       return pair.second;
     }
-    else
-    {
-      next_state = state;
-    }
   }
   return next_state;
 }
