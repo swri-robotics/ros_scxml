@@ -152,7 +152,6 @@ const QString ScxmlSMInterface::getNeighbor(const QString& state, const QString&
   {
     if (pair.first == search_text)
     {
-      //              next_state = pair.second();
       return pair.second;
     }
   }
