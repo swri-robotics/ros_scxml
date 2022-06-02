@@ -161,13 +161,23 @@ const QString ScxmlSMInterface::getNeighbor(const QString& state, const QString&
 
 bool ScxmlSMInterface::eventExists(const QString& event, std::set<std::pair<QString, QString>> events)
 {
+  int i = 0;
+  const int j = events.size();
   for (auto& pair : events)
   {
     if (pair.first == event)
     {
       return true;
     }
-    return false;
+    else
+    {
+      i = i + 1;
+    }
+
+    if (i == j)
+    {
+      return false;
+    }
   }
 }
 
