@@ -9,7 +9,13 @@ Lightweight finite state machine library that uses the [SCXML](https://commons.a
 ---
 ## Prerequisites
 ### QT 5
-The `QScxml` module is available from `Qt` version 5.7 and higher and is currently only distributed on Ubuntu 20.04. If your distribution or version of `Qt` does not have the `QScxml` module there are several options for getting it:
+The `QScxml` module is available from `Qt` version 5.7 and higher and is currently only distributed on Ubuntu 20.04. Use the following command to install it:
+
+```bash
+sudo apt install libqt5scxml5-dev libqt5scxml5-bin
+```
+
+If your distribution or version of `Qt` does not have the `QScxml` module there are several options for getting it:
 
 #### Qt Modules PPA (Recommended)
 [This PPA](https://launchpad.net/~skycoder42/+archive/ubuntu/qt-modules) provides binary distributions of the `QScxml` module for Ubuntu 17.10 and 18.04.
