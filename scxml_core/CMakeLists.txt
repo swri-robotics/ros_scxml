@@ -1,9 +1,13 @@
 cmake_minimum_required(VERSION 3.5)
-project(scxml_core VERSION 0.2.0 LANGUAGES CXX)
+
+# Extract package name and version from package.xml
+find_package(ros_industrial_cmake_boilerplate REQUIRED)
+extract_package_metadata(pkg)
+
+project(${pkg_extracted_name} VERSION ${pkg_extracted_version} LANGUAGES CXX)
 
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake/")
 
-find_package(ros_industrial_cmake_boilerplate REQUIRED)
 find_package(Qt5 REQUIRED COMPONENTS Core Scxml)
 find_package(TinyXML2 REQUIRED)
 
@@ -50,7 +54,7 @@ install(
 ## Test ##
 ##########
 
-if(ENABLE_TESTING)
+if(BUILD_TESTING)
   enable_testing()
   add_subdirectory(test)
 endif()
