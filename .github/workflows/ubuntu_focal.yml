@@ -35,6 +35,7 @@ jobs:
           sudo rosdep init -q
           rosdep update -q
           rosdep install --from-paths src --ignore-src -r -y -q
+          sudo apt install -q -y libqt5scxml5-dev libqt5scxml5-bin
 
       - name: Build
         working-directory: ../..
