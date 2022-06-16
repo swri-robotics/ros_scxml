@@ -1,0 +1,45 @@
+name: Ubuntu-Focal
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  schedule:
+    - cron: '0 5 * * *'
+
+jobs:
+  ci:
+    name: Ubuntu-Focal
+    runs-on: ubuntu-latest
+    env:
+      PROJECT_DIR: src/ros_scxml
+    steps:
+      - name: Prepare workspace
+        working-directory: ..
+        run: |
+          mkdir -p ${{ env.PROJECT_DIR }}
+
+      - uses: actions/checkout@v1
+        with:
+          path: ${{ env.PROJECT_DIR }}
+
+      - name: Install dependencies
+        working-directory: ../..
+        run: |
+          sudo apt update -q
+          sudo apt install -q -y clang-tidy python3 python3-pip
+          sudo pip3 install -q --upgrade pip
+          sudo pip3 install -q colcon-common-extensions vcstool
+          vcs import src < ${{ env.PROJECT_DIR }}/dependencies.repos
+
+      - name: Build
+        working-directory: ../..
+        run: |
+          colcon build --cmake-args -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTING=ON
+
+      - name: Test
+        working-directory: ../..
+        run: |
+          colcon test
+          colcon test-result
