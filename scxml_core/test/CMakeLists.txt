@@ -9,8 +9,8 @@ target_cxx_version(${PROJECT_NAME}_utest PRIVATE VERSION 14)
 
 add_test(NAME run_tests COMMAND ${PROJECT_NAME}_utest)
 
-install(TARGETS ${PROJECT_NAME}_utest
+install(
+  TARGETS ${PROJECT_NAME}_utest
   RUNTIME DESTINATION bin/tests
   LIBRARY DESTINATION lib/tests
-  ARCHIVE DESTINATION lib/tests
-)
+  ARCHIVE DESTINATION lib/tests)
