@@ -30,8 +30,11 @@ jobs:
           sudo apt update -q
           sudo apt install -q -y clang-tidy python3 python3-pip
           sudo pip3 install -q --upgrade pip
-          sudo pip3 install -q colcon-common-extensions vcstool
+          sudo pip3 install -q colcon-common-extensions vcstool rosdep
           vcs import src < ${{ env.PROJECT_DIR }}/dependencies.repos
+          sudo rosdep init -q
+          rosdep update -q
+          rosdep install --from-paths src --ignore-src -r -y -q
 
       - name: Build
         working-directory: ../..
