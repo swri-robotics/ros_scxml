@@ -34,6 +34,12 @@ To install, run:
 sudo add-apt-repository ppa:beineri/opt-qt-5.12.10-bionic
 sudo apt-get update
 sudo apt install qt512scxml
+=======
+The `QScxml` module is available from `Qt` version 5.7 and higher and is currently only distributed on Ubuntu 20.04. Use the following command to install it:
+
+```bash
+sudo apt install libqt5scxml5-dev libqt5scxml5-bin
+>>>>>>> 9176eb6c2605637e9cd43839e23055aa3586e1da
 ```
 > Note: Edit command above for your desired version of `Qt`
 

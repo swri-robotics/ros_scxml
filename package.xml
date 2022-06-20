@@ -8,9 +8,11 @@
   <license>BSD3</license>
 
   <depend>ros_industrial_cmake_boilerplate</depend>
+  <depend>libqt5-core</depend>
+  <depend>qtdeclarative5-dev</depend>
   <depend>tinyxml2</depend>
 
   <export>
-    <build_type> cmake </build_type>
+    <build_type>cmake</build_type>
   </export>
 </package>
