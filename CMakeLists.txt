@@ -30,11 +30,11 @@ target_cxx_version(${PROJECT_NAME}_demo PUBLIC VERSION 14)
 # Install ##
 # ######################################################################################################################
 
-configure_package(NAMESPACE scxml_core TARGETS ${PROJECT_NAME} ${PROJECT_NAME}_demo)
-
 install(DIRECTORY include/ DESTINATION include)
 
 install(FILES "${CMAKE_CURRENT_LIST_DIR}/cmake/FindTinyXML2.cmake" DESTINATION lib/cmake/${PROJECT_NAME})
+
+configure_package(NAMESPACE scxml_core DEPENDENCIES "Qt5 REQUIRED COMPONENTS Core Scxml" TARGETS ${PROJECT_NAME} ${PROJECT_NAME}_demo)
 
 # ######################################################################################################################
 # Test ##
