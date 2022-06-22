@@ -34,7 +34,8 @@ install(DIRECTORY include/ DESTINATION include)
 
 install(FILES "${CMAKE_CURRENT_LIST_DIR}/cmake/FindTinyXML2.cmake" DESTINATION lib/cmake/${PROJECT_NAME})
 
-configure_package(NAMESPACE scxml_core DEPENDENCIES "Qt5 REQUIRED COMPONENTS Core Scxml" TARGETS ${PROJECT_NAME} ${PROJECT_NAME}_demo)
+configure_package(NAMESPACE scxml_core DEPENDENCIES "Qt5 REQUIRED COMPONENTS Core Scxml" TARGETS ${PROJECT_NAME}
+                                                                                                 ${PROJECT_NAME}_demo)
 
 # ######################################################################################################################
 # Test ##

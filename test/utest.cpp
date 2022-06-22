@@ -97,7 +97,7 @@ private slots:
       }
 
       QList<QString> events;
-      QList<QString>::iterator k;
+      QList<QString>::iterator k = 1;
       for (auto pair : action_ids)
       {
         events.insert(k, pair.first);
