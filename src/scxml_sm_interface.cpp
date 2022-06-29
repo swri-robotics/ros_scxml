@@ -155,7 +155,8 @@ const QString ScxmlSMInterface::getNeighbor(const QString& state, const QString&
       return pair.second;
     }
   }
-  return next_state;
+  throw std::runtime_error("State '" + state.toStdString() + "' does not have a neighbor after transition '" +
+                           search_text.toStdString() + "'");
 }
 
 bool ScxmlSMInterface::eventExists(const QString& event, std::set<std::pair<QString, QString>> events)
