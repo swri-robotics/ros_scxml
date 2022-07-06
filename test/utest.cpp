@@ -97,18 +97,16 @@ private slots:
       }
 
       QList<QString> events;
-      QList<QString>::iterator k = 1;
       for (auto pair : action_ids)
       {
-        events.insert(k, pair.first);
-        k += 1;
+        events.push_back(pair.first);
       }
 
       // Choose a random event to submit
       static std::mt19937 gen(1);
       std::uniform_int_distribution<int> dist(0, available_events.size() - 1);
 
-      const QString event = events.at(dist(gen));
+      const QString event = std::next(available_events.begin(), dist(gen))->first;
 
       std::cout << "Event: " << event.toStdString() << std::endl;
       QVERIFY(sm.submitEvent(event));
