@@ -47,11 +47,7 @@ static void getStateTransitionsRecursive(tinyxml2::XMLElement* state,
       throw std::runtime_error("'" + std::string(TRANSITION_ELEMENT) + "' element does not have '" +
                                std::string(EVENT_ATTRIBUTE) + "' attribute");
 
-    const char* name = transition->Attribute(TARGET_ATTRIBUTE);
-
-    std::pair<QString, QString> list = std::make_pair(QString(event), QString(name));
-
-    inherited_events.insert(list);
+    inherited_events.emplace(QString(event), QString(transition->Attributie(TARGET_ATTRIBUTE)));
 
     // Add the event name to the map
     map[state_id] = inherited_events;
@@ -159,26 +155,10 @@ const QString ScxmlSMInterface::getNeighbor(const QString& state, const QString&
                            search_text.toStdString() + "'");
 }
 
-bool ScxmlSMInterface::eventExists(const QString& event, std::set<std::pair<QString, QString>> events)
+static bool ScxmlSMInterface::eventExists(const QString& event, const std::set<std::pair<QString, QString>>& events)
 {
-  int i = 0;
-  const int j = events.size();
-  for (auto& pair : events)
-  {
-    if (pair.first == event)
-    {
-      return true;
-    }
-    else
-    {
-      i = i + 1;
-    }
-
-    if (i == j)
-    {
-      return false;
-    }
-  }
+  return std::any_of(
+      events.begin(), events.end(), [&event](const std::pair<QString, QString>&) { return pair.first == event });
 }
 
 void ScxmlSMInterface::addOnEntryCallback(const QString& state, const std::function<void()>& callback, bool async)

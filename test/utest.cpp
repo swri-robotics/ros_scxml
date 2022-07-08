@@ -106,7 +106,7 @@ private slots:
       static std::mt19937 gen(1);
       std::uniform_int_distribution<int> dist(0, available_events.size() - 1);
 
-      const QString event = std::next(available_events.begin(), dist(gen))->first;
+      const QString event = std::next(available_events.begin(), dist(gen)).first;
 
       std::cout << "Event: " << event.toStdString() << std::endl;
       QVERIFY(sm.submitEvent(event));

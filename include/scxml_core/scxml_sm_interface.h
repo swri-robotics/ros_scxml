@@ -4,7 +4,6 @@
 #include <QSet>
 #include <QFuture>
 #include <set>
-#include <scxml_core/scxml_sm_interface.h>
 
 namespace scxml_core
 {
@@ -26,23 +25,21 @@ public:
   ScxmlSMInterface(const std::string& scxml_file);
 
   /**
-   * @brief checks if an event exists
+   * @brief
+   * @param events set of pairs of transitions and associated states
    */
-  bool eventExists(const QString& event, std::set<std::pair<QString, QString>> events);
+  static bool eventExists(const QString& event, const std::set<std::pair<QString, QString>>& events);
 
   /**
-   * @brief gets the state to which a desired transition occurs
-   * @param search_text - insert transition text you'd like to match
-   * @throws if you don't have that transition, it will return itself as it's neighbor
+   * @brief Returns the state to which a desired transition leads
    */
+  const QString getNeighbor(const QString& state, const QString& transition) const;
 
-  const QString getNeighbor(const QString& state, const QString& search_text);
   /**
    * @brief Adds a callback to the input state that will be invoked on entry to the state
    * @param async - flag for executing the input callback asynchronously
    * @throws exception if the state does not exist in the state machine
    */
-
   void addOnEntryCallback(const QString& state, const std::function<void()>& callback, bool async = false);
 
   /**
