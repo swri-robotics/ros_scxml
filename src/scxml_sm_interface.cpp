@@ -156,7 +156,7 @@ const QString ScxmlSMInterface::getNeighbor(const QString& state, const QString&
 static bool ScxmlSMInterface::eventExists(const QString& event, const std::set<std::pair<QString, QString>>& events)
 {
   return std::any_of(
-      events.begin(), events.end(), [&event](const std::pair<QString, QString>& pair) { return pair.first == event });
+      events.begin(), events.end(), [&event](const std::pair<QString, QString>& pair) { return pair.first == event; });
 }
 
 void ScxmlSMInterface::addOnEntryCallback(const QString& state, const std::function<void()>& callback, bool async)
