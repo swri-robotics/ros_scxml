@@ -142,8 +142,6 @@ ScxmlSMInterface::ScxmlSMInterface(const std::string& scxml_file)
 // use this to determine the next state in the state machine, given the name of the transition you'd like to query
 const QString ScxmlSMInterface::getNeighbor(const QString& state, const QString& search_text)
 {
-  QString next_state;
-
   for (auto& pair : state_transition_map_.at(state))
   {
     if (pair.first == search_text)
