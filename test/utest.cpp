@@ -169,25 +169,25 @@ private slots:
 
     // Submit the events and check that the state machine moves to the corresponding state
     for (int i = 0; i < SM_SEQUENCE.size(); ++i)
+    {
+      // Issue the transition a few times when we know that the entry callbacks are not complete
+      for (int j = 0; j < 5; ++j)
       {
-        // Issue the transition a few times when we know that the entry callbacks are not complete
-        for (int j = 0; j < 5; ++j)
-        {
-          QVERIFY(!sm.submitEvent(SM_SEQUENCE.at(i).first));
-        }
-
-        // Wait for the task to finish
-        QStringList active_states = sm.getSM()->activeStateNames();
-        sm.getStateFuture(active_states.at(0)).waitForFinished();
-
-        // Submit the event, now that we know the callback is complete
-        QVERIFY(sm.submitEvent(SM_SEQUENCE.at(i).first));
-        QTest::qWait(100);
-
-        // Check that the expected state is now active
-        active_states = sm.getSM()->activeStateNames();
-        QVERIFY(active_states.at(0) == SM_SEQUENCE.at(i).second);
+        QVERIFY(!sm.submitEvent(SM_SEQUENCE.at(i).first));
       }
+
+      // Wait for the task to finish
+      QStringList active_states = sm.getSM()->activeStateNames();
+      sm.getStateFuture(active_states.at(0)).waitForFinished();
+
+      // Submit the event, now that we know the callback is complete
+      QVERIFY(sm.submitEvent(SM_SEQUENCE.at(i).first));
+      QTest::qWait(100);
+
+      // Check that the expected state is now active
+      active_states = sm.getSM()->activeStateNames();
+      QVERIFY(active_states.at(0) == SM_SEQUENCE.at(i).second);
+    }
   }
 };
 

@@ -74,8 +74,8 @@ int main(int argc, char** argv)
           std::cout << "Event name: " << input.toStdString() << " was not in the list of available events "
                     << std::endl;
         }
-        }
       }
+    }
   }
   catch (const std::exception& ex)
   {
