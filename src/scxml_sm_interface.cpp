@@ -13,6 +13,17 @@ static const char* EVENT_ATTRIBUTE = "event";
 static const char* TARGET_ATTRIBUTE = "target";
 
 /**
+ * @brief checks if events exists based on a string search
+ * @param Qstring event to find
+ * @param set of [event,target]
+ */
+static bool eventExists(const QString& event, const std::set<std::pair<QString, QString>>& events)
+{
+  return std::any_of(
+      events.begin(), events.end(), [&event](const std::pair<QString, QString>& pair) { return pair.first == event; });
+}
+
+/**
  * @brief Recursively adds states and transitions to the map
  * @param state
  * @param map
@@ -140,7 +151,7 @@ ScxmlSMInterface::ScxmlSMInterface(const std::string& scxml_file)
 }
 
 // use this to determine the next state in the state machine, given the name of the transition you'd like to query
-const QString ScxmlSMInterface::getNeighbor(const QString& state, const QString& search_text)
+QString ScxmlSMInterface::getNeighbor(const QString& state, const QString& search_text)
 {
   for (auto& pair : state_transition_map_.at(state))
   {
@@ -151,12 +162,6 @@ const QString ScxmlSMInterface::getNeighbor(const QString& state, const QString&
   }
   throw std::runtime_error("State '" + state.toStdString() + "' does not have a neighbor after transition '" +
                            search_text.toStdString() + "'");
-}
-
-static bool ScxmlSMInterface::eventExists(const QString& event, const std::set<std::pair<QString, QString>>& events)
-{
-  return std::any_of(
-      events.begin(), events.end(), [&event](const std::pair<QString, QString>& pair) { return pair.first == event; });
 }
 
 void ScxmlSMInterface::addOnEntryCallback(const QString& state, const std::function<void()>& callback, bool async)

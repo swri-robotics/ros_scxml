@@ -45,9 +45,8 @@ int main(int argc, char** argv)
       for (const auto& pair : available_events)
       {
         ss << pair.first.toStdString() << " ";
-        ss << "]";
       }
-
+      ss << "]";
       // Get user input as to which event to execute
       bool done = false;
       while (!done)
@@ -55,29 +54,28 @@ int main(int argc, char** argv)
         std::cout << ss.str() << std::endl;
 
         // Get the character input
-        auto input = std::cin.get();
+        std::string str;
+        std::getline(std::cin, str);
+        QString input(str.c_str());
         // Throw away the enter input
         std::cin.get();
 
-        if (std::isdigit(input))
+        try
         {
-          int idx = static_cast<int>(input) - 48;
-          if (idx < available_events.size())
+          for (const auto& pair : available_events)
           {
-            interface.submitEvent(available_events.toList().at(idx));
+            if (pair.first == input)
+              interface.submitEvent(input);
             done = true;
           }
-          else
-          {
-            std::cout << "Index " << idx << " was not in range [0, " << available_events.size() - 1 << "]" << std::endl;
-          }
         }
-        else
+        catch (...)
         {
-          std::cout << "Input must be numeric" << std::endl;
+          std::cout << "Event name: " << input.toStdString() << " was not in the list of available events "
+                    << std::endl;
+        }
         }
       }
-    }
   }
   catch (const std::exception& ex)
   {

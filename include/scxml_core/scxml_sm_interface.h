@@ -23,17 +23,10 @@ class ScxmlSMInterface
 {
 public:
   ScxmlSMInterface(const std::string& scxml_file);
-
-  /**
-   * @brief
-   * @param events set of pairs of transitions and associated states
-   */
-  static bool eventExists(const QString& event, const std::set<std::pair<QString, QString>>& events);
-
   /**
    * @brief Returns the state to which a desired transition leads
    */
-  const QString getNeighbor(const QString& state, const QString& transition) const;
+  QString getNeighbor(const QString& state, const QString& transition);
 
   /**
    * @brief Adds a callback to the input state that will be invoked on entry to the state
