@@ -90,17 +90,7 @@ private slots:
 
       // Get the available events for the first active state
       std::set<std::pair<QString, QString>> action_ids = sm.getStateTransitionMap().at(active_states.first());
-      if (action_ids.empty())
-      {
-        std::cout << "State '" << active_states.at(0).toStdString() << "' has no available events" << std::endl;
-        break;
-      }
-
-      QList<QString> events;
-      for (auto pair : action_ids)
-      {
-        events.push_back(pair.first);
-      }
+      QVERIFY(!action_ids.empty());
 
       // Choose a random event to submit
       static std::mt19937 gen(1);
