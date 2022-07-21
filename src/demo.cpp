@@ -47,6 +47,7 @@ int main(int argc, char** argv)
         ss << pair.first.toStdString() << " ";
       }
       ss << "]";
+
       // Get user input as to which event to execute
       bool done = false;
       while (!done)
@@ -57,8 +58,6 @@ int main(int argc, char** argv)
         std::string str;
         std::getline(std::cin, str);
         QString input(str.c_str());
-        // Throw away the enter input
-        std::cin.get();
 
         try
         {
