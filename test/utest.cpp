@@ -4,6 +4,7 @@
 #include <QtTest/QtTest>
 #include <thread>
 #include <random>
+#include <algorithm>
 
 using namespace scxml_core;
 
@@ -80,17 +81,22 @@ private slots:
       QVERIFY(active_states.size() > 0);
 
       // Get the available events for the first active state
-      const QSet<QString> available_events = map.at(active_states.at(0));
+      const std::set<std::pair<QString, QString>> available_events = map.at(active_states.at(0));
       if (available_events.empty())
       {
         std::cout << "State '" << active_states.at(0).toStdString() << "' has no available events" << std::endl;
         break;
       }
 
+      // Get the available events for the first active state
+      std::set<std::pair<QString, QString>> action_ids = sm.getStateTransitionMap().at(active_states.first());
+      QVERIFY(!action_ids.empty());
+
       // Choose a random event to submit
       static std::mt19937 gen(1);
       std::uniform_int_distribution<int> dist(0, available_events.size() - 1);
-      const QString event = available_events.toList().at(dist(gen));
+
+      const QString event = std::next(available_events.begin(), dist(gen))->first;
 
       std::cout << "Event: " << event.toStdString() << std::endl;
       QVERIFY(sm.submitEvent(event));

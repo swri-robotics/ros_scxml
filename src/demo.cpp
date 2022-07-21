@@ -38,13 +38,13 @@ int main(int argc, char** argv)
       // Get the active state and available events
       QStringList active_states = interface.getSM()->activeStateNames();
       const QString& current_state = active_states.at(0);
-      QSet<QString> available_events = map.at(current_state);
+      std::set<std::pair<QString, QString>> available_events = map.at(current_state);
 
       std::stringstream ss;
       ss << "Available events: [ ";
-      for (const QString& event : available_events)
+      for (const auto& pair : available_events)
       {
-        ss << event.toStdString() << " ";
+        ss << pair.first.toStdString() << " ";
       }
       ss << "]";
 
@@ -55,26 +55,23 @@ int main(int argc, char** argv)
         std::cout << ss.str() << std::endl;
 
         // Get the character input
-        auto input = std::cin.get();
-        // Throw away the enter input
-        std::cin.get();
+        std::string str;
+        std::getline(std::cin, str);
+        QString input(str.c_str());
 
-        if (std::isdigit(input))
+        try
         {
-          int idx = static_cast<int>(input) - 48;
-          if (idx < available_events.size())
+          for (const auto& pair : available_events)
           {
-            interface.submitEvent(available_events.toList().at(idx));
+            if (pair.first == input)
+              interface.submitEvent(input);
             done = true;
           }
-          else
-          {
-            std::cout << "Index " << idx << " was not in range [0, " << available_events.size() - 1 << "]" << std::endl;
-          }
         }
-        else
+        catch (...)
         {
-          std::cout << "Input must be numeric" << std::endl;
+          std::cout << "Event name: " << input.toStdString() << " was not in the list of available events "
+                    << std::endl;
         }
       }
     }
