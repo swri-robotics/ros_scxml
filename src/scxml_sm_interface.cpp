@@ -150,14 +150,38 @@ ScxmlSMInterface::ScxmlSMInterface(const std::string& scxml_file)
   }
 }
 
-// use this to determine the next state in the state machine, given the name of the transition you'd like to query
-QString ScxmlSMInterface::getNeighbor(const QString& state, const QString& search_text)
+QString ScxmlSMInterface::find_text(const QString& state, const QString& search_text)
 {
   for (auto& pair : state_transition_map_.at(state))
   {
     if (pair.first == search_text)
     {
       return pair.second;
+    }
+  }
+  throw std::runtime_error("State '" + state.toStdString() + "' does not have a neighbor after transition '" +
+                           search_text.toStdString() + "'");
+}
+
+// use this to determine the next state in the state machine, given the name of the transition you'd like to query
+QString ScxmlSMInterface::getNeighbor(const QString& state, const QString& search_text, const bool recursive)
+{
+  QString answer;
+  try
+  {
+    return find_text(state, search_text);
+  }
+  catch (std::runtime_error)
+  {
+    if (recursive)
+    {
+      QStringList active_states = sm_->activeStateNames(false);
+      for (int i = 0; i < active_states.size(); i++)
+        // Next state
+        if ((not QString::compare(active_states.at(i), state)) && (not QString::compare(active_states.at(i), "Master")))
+        {
+          return find_text(state, search_text);
+        }
     }
   }
   throw std::runtime_error("State '" + state.toStdString() + "' does not have a neighbor after transition '" +
