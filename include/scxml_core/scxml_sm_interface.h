@@ -25,9 +25,10 @@ public:
   ScxmlSMInterface(const std::string& scxml_file);
   /**
    * @brief Returns the state to which a desired transition leads
-   * @param recursive - checks parent states for the desired transition
    */
-  QString getNeighbor(const QString& state, const QString& transition, const bool recursive = false);
+  QString getNeighbor(const QString& state, const QString& transition);
+
+  QString getActiveStateNeighbor(const QString& transition);
 
   /**
    * @brief Adds a callback to the input state that will be invoked on entry to the state

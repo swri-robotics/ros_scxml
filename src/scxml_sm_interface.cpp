@@ -150,42 +150,34 @@ ScxmlSMInterface::ScxmlSMInterface(const std::string& scxml_file)
   }
 }
 
-QString ScxmlSMInterface::find_text(const QString& state, const QString& search_text)
+QString ScxmlSMInterface::getNeighbor(const QString& state, const QString& transition)
 {
   for (auto& pair : state_transition_map_.at(state))
   {
-    if (pair.first == search_text)
+    if (pair.first == transition)
     {
       return pair.second;
     }
   }
   throw std::runtime_error("State '" + state.toStdString() + "' does not have a neighbor after transition '" +
-                           search_text.toStdString() + "'");
+                           transition.toStdString() + "'");
 }
 
 // use this to determine the next state in the state machine, given the name of the transition you'd like to query
-QString ScxmlSMInterface::getNeighbor(const QString& state, const QString& search_text, const bool recursive)
+QString ScxmlSMInterface::getActiveStateNeighbor(const QString& transition)
 {
-  QString answer;
-  try
+  for (const QString& state : sm_->activeStateNames(false))
   {
-    return find_text(state, search_text);
-  }
-  catch (std::runtime_error)
-  {
-    if (recursive)
+    try
     {
-      QStringList active_states = sm_->activeStateNames(false);
-      for (int i = 0; i < active_states.size(); i++)
-        // Next state
-        if ((not QString::compare(active_states.at(i), state)) && (not QString::compare(active_states.at(i), "Master")))
-        {
-          return find_text(state, search_text);
-        }
+      return getNeighbor(state, transition);
+    }
+    catch (const std::exception&)
+    {
     }
   }
-  throw std::runtime_error("State '" + state.toStdString() + "' does not have a neighbor after transition '" +
-                           search_text.toStdString() + "'");
+  throw std::runtime_error("Active state & parents do not have a neighbor after transition '" +
+                           transition.toStdString() + "'");
 }
 
 void ScxmlSMInterface::addOnEntryCallback(const QString& state, const std::function<void()>& callback, bool async)
