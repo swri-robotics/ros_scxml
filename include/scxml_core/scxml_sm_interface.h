@@ -28,6 +28,9 @@ public:
    */
   QString getNeighbor(const QString& state, const QString& transition);
 
+  /**
+   * @brief Returns the state to which a desired transition leads, including states owned by higher-level active states
+   */
   QString getActiveStateNeighbor(const QString& transition);
 
   /**
