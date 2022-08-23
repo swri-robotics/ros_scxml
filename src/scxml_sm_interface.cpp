@@ -163,7 +163,6 @@ QString ScxmlSMInterface::getNeighbor(const QString& state, const QString& trans
                            transition.toStdString() + "'");
 }
 
-// use this to determine the next state in the state machine, given the name of the transition you'd like to query
 QString ScxmlSMInterface::getActiveStateNeighbor(const QString& transition)
 {
   for (const QString& state : sm_->activeStateNames(false))

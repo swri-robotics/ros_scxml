@@ -24,12 +24,13 @@ class ScxmlSMInterface
 public:
   ScxmlSMInterface(const std::string& scxml_file);
   /**
-   * @brief Returns the state to which a desired transition leads
+   * @brief Returns the state to which a desired transition leads, from the input state
    */
   QString getNeighbor(const QString& state, const QString& transition);
 
   /**
-   * @brief Returns the state to which a desired transition leads, including states owned by higher-level active states
+   * @brief Returns the state to which a desired transition leads, from the current state (including any active
+   * higher-level parent states)
    */
   QString getActiveStateNeighbor(const QString& transition);
 
@@ -66,9 +67,6 @@ protected:
   QScxmlStateMachine* sm_;
   const StateTransitionMap state_transition_map_;
   std::map<QString, QFuture<void>> future_map_;
-
-private:
-  QString find_text(const QString& state, const QString& search_text);
 };
 
 }  // namespace scxml_core
