@@ -24,9 +24,15 @@ class ScxmlSMInterface
 public:
   ScxmlSMInterface(const std::string& scxml_file);
   /**
-   * @brief Returns the state to which a desired transition leads
+   * @brief Returns the state to which a desired transition leads, from the input state
    */
   QString getNeighbor(const QString& state, const QString& transition);
+
+  /**
+   * @brief Returns the state to which a desired transition leads, from the current state (including any active
+   * higher-level parent states)
+   */
+  QString getActiveStateNeighbor(const QString& transition);
 
   /**
    * @brief Adds a callback to the input state that will be invoked on entry to the state

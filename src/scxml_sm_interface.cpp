@@ -150,18 +150,33 @@ ScxmlSMInterface::ScxmlSMInterface(const std::string& scxml_file)
   }
 }
 
-// use this to determine the next state in the state machine, given the name of the transition you'd like to query
-QString ScxmlSMInterface::getNeighbor(const QString& state, const QString& search_text)
+QString ScxmlSMInterface::getNeighbor(const QString& state, const QString& transition)
 {
   for (auto& pair : state_transition_map_.at(state))
   {
-    if (pair.first == search_text)
+    if (pair.first == transition)
     {
       return pair.second;
     }
   }
   throw std::runtime_error("State '" + state.toStdString() + "' does not have a neighbor after transition '" +
-                           search_text.toStdString() + "'");
+                           transition.toStdString() + "'");
+}
+
+QString ScxmlSMInterface::getActiveStateNeighbor(const QString& transition)
+{
+  for (const QString& state : sm_->activeStateNames(false))
+  {
+    try
+    {
+      return getNeighbor(state, transition);
+    }
+    catch (const std::exception&)
+    {
+    }
+  }
+  throw std::runtime_error("Active state & parents do not have a neighbor after transition '" +
+                           transition.toStdString() + "'");
 }
 
 void ScxmlSMInterface::addOnEntryCallback(const QString& state, const std::function<void()>& callback, bool async)
