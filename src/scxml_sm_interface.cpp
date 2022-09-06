@@ -165,11 +165,15 @@ QString ScxmlSMInterface::getNeighbor(const QString& state, const QString& trans
 
 QString ScxmlSMInterface::getActiveStateNeighbor(const QString& transition)
 {
-  for (const QString& state : sm_->activeStateNames(false))
+  const QStringList states = sm_->activeStateNames(false);
+
+  // `activeStateNames` returns the list of active state names, starting with the highest level state and ending with
+  // the leaf. Iterate over the active state names in reverse to start with the leaf state
+  for (auto it = states.rbegin(); it != states.rend(); ++it)
   {
     try
     {
-      return getNeighbor(state, transition);
+      return getNeighbor(*it, transition);
     }
     catch (const std::exception&)
     {
